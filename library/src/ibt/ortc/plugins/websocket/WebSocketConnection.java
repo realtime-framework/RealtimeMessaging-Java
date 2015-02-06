@@ -241,7 +241,7 @@ public class WebSocketConnection implements WebSocket {
                 	lSocket = factory.createSocket(host, port);
                 }
 
-                String[] protocols = { "SSLv3" };
+                String[] protocols = { "TLSv1" };
                 ((SSLSocket) lSocket).setEnabledProtocols(protocols);
                 // CAUSE: Prefer throwing/catching meaningful exceptions instead of Exception
             } catch (IOException ioe) {
