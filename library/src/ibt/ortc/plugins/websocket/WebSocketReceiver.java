@@ -56,6 +56,11 @@ public class WebSocketReceiver
                     eventHandler.onMessage(new WebSocketMessage(message));
                     messageBytes.clear();
                 }
+                else if (b == -1) {
+                    frameStart = false;
+                    messageBytes.clear();
+                    handleError();
+                }
                 else if (frameStart == true){
                     messageBytes.add((byte)b);
                 }
