@@ -2,10 +2,12 @@ package ibt.ortc.api;
 
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
@@ -61,96 +63,128 @@ public class Presence {
 		return result;
 	}
 	
-	protected static void getPresence(String url, Boolean isCluster, String applicationKey, String authenticationToken, String channel, Proxy proxy, final OnPresence callback){
-		String presenceUrl = Balancer.getServerUrl(url, isCluster, applicationKey, proxy);
-		
-        // CAUSE: Prefer String.format to +
-        presenceUrl = Strings.isNullOrEmpty(presenceUrl) ? presenceUrl : presenceUrl.charAt(presenceUrl.length() -1) == '/' ? presenceUrl : String.format("%s/", presenceUrl);
-		
-        // CAUSE: Prefer String.format to +
-        presenceUrl += String.format("presence/%s/%s/%s", applicationKey, authenticationToken, channel);
-		
+	protected static void getPresence(String url, Boolean isCluster, final String applicationKey, final String authenticationToken, final String channel, final Proxy proxy, final OnPresence callback){
 		try {
-			URL requestUrl = new URL(presenceUrl);
-			
-			RestWebservice.getAsync(requestUrl, proxy, new OnRestWebserviceResponse() {
-				
+			Balancer.getServerUrlAsyn(url, isCluster, applicationKey, proxy, new OnRestWebserviceResponse() {
 				@Override
-				public void run(Exception error, String response) {
+				public void run(Exception error, String presenceUrl) {
 					if(error != null){
 						callback.run(error, null);
 					}else{
-                        Presence result = Presence.deserialize(response);
-						callback.run(null, result);
-					}					
+						// CAUSE: Prefer String.format to +
+				        presenceUrl = Strings.isNullOrEmpty(presenceUrl) ? presenceUrl : presenceUrl.charAt(presenceUrl.length() -1) == '/' ? presenceUrl : String.format("%s/", presenceUrl);
+						
+				        // CAUSE: Prefer String.format to +
+				        presenceUrl += String.format("presence/%s/%s/%s", applicationKey, authenticationToken, channel);
+						
+						try {
+							URL requestUrl = new URL(presenceUrl);
+							
+							RestWebservice.getAsync(requestUrl, proxy, new OnRestWebserviceResponse() {
+								
+								@Override
+								public void run(Exception error, String response) {
+									if(error != null){
+										callback.run(error, null);
+									}else{
+				                        Presence result = Presence.deserialize(response);
+										callback.run(null, result);
+									}					
+								}
+							});			
+				        } catch (IOException e) {
+							callback.run(e, null);
+						}
+					}
 				}
-			});			
-        } catch (IOException e) {
+			});
+		} catch (MalformedURLException e) {
 			callback.run(e, null);
 		}
 	}
 	
-	protected static void enablePresence(String url,Boolean isCluster,String applicationKey, String privateKey, String channel, Boolean metadata, Proxy proxy, final OnEnablePresence callback){
-		String presenceUrl = Balancer.getServerUrl(url, isCluster, applicationKey, proxy);
-				
-        // CAUSE: Prefer String.format to +
-        presenceUrl = Strings.isNullOrEmpty(presenceUrl) ? presenceUrl : presenceUrl.charAt(presenceUrl.length() -1) == '/' ? presenceUrl : String.format("%s/", presenceUrl);
-		
-        // CAUSE: Prefer String.format to +
-        presenceUrl += String.format("presence/enable/%s/%s", applicationKey, channel);
-		
-        // CAUSE: Prefer String.format to +
-        String content = String.format("privatekey=%s", privateKey);
-		if(metadata){
-			content += "&metadata=1";
-		}
-		
+	protected static void enablePresence(String url,Boolean isCluster,final String applicationKey, final String privateKey, final String channel, final Boolean metadata, final Proxy proxy, final OnEnablePresence callback){
 		try {
-			URL requestUrl = new URL(presenceUrl);
-			
-			RestWebservice.postAsync(requestUrl,content, proxy, new OnRestWebserviceResponse() {
-				
+			Balancer.getServerUrlAsyn(url, isCluster, applicationKey, proxy, new OnRestWebserviceResponse() {
 				@Override
-				public void run(Exception error, String response) {
+				public void run(Exception error, String presenceUrl) {
 					if(error != null){
 						callback.run(error, null);
 					}else{
-						callback.run(null, response);
-					}					
+						presenceUrl = Strings.isNullOrEmpty(presenceUrl) ? presenceUrl : presenceUrl.charAt(presenceUrl.length() -1) == '/' ? presenceUrl : String.format("%s/", presenceUrl);
+						
+				        // CAUSE: Prefer String.format to +
+				        presenceUrl += String.format("presence/enable/%s/%s", applicationKey, channel);
+						
+				        // CAUSE: Prefer String.format to +
+				        String content = String.format("privatekey=%s", privateKey);
+						if(metadata){
+							content += "&metadata=1";
+						}
+						
+						try {
+							URL requestUrl = new URL(presenceUrl);
+							
+							RestWebservice.postAsync(requestUrl,content, proxy, new OnRestWebserviceResponse() {
+								
+								@Override
+								public void run(Exception error, String response) {
+									if(error != null){
+										callback.run(error, null);
+									}else{
+										callback.run(null, response);
+									}					
+								}
+							});			
+				        } catch (IOException e) {
+							callback.run(e, null);
+						}
+					}
 				}
-			});			
-        } catch (IOException e) {
+			});
+		} catch (MalformedURLException e) {
 			callback.run(e, null);
 		}
 	}
 	
-	protected static void disablePresence(String url,Boolean isCluster,String applicationKey, String privateKey, String channel, Proxy proxy, final OnDisablePresence callback){
-		String presenceUrl = Balancer.getServerUrl(url, isCluster, applicationKey, proxy);
-		
-        // CAUSE: Prefer String.format to +
-        presenceUrl = Strings.isNullOrEmpty(presenceUrl) ? presenceUrl : presenceUrl.charAt(presenceUrl.length() -1) == '/' ? presenceUrl : String.format("%s/", presenceUrl);
-		
-        // CAUSE: Prefer String.format to +
-        presenceUrl += String.format("presence/disable/%s/%s", applicationKey, channel);
-		
-        // CAUSE: Prefer String.format to +
-        String content = String.format("privatekey=%s", privateKey);
-		
+	protected static void disablePresence(String url,Boolean isCluster,final String applicationKey, final String privateKey, final String channel, final Proxy proxy, final OnDisablePresence callback){
 		try {
-			URL requestUrl = new URL(presenceUrl);
-			
-			RestWebservice.postAsync(requestUrl,content, proxy, new OnRestWebserviceResponse() {
-				
+			Balancer.getServerUrlAsyn(url, isCluster, applicationKey, proxy, new OnRestWebserviceResponse() {
 				@Override
-				public void run(Exception error, String response) {
+				public void run(Exception error, String presenceUrl) {
 					if(error != null){
 						callback.run(error, null);
 					}else{
-						callback.run(null, response);
-					}					
+						// CAUSE: Prefer String.format to +
+				        presenceUrl = Strings.isNullOrEmpty(presenceUrl) ? presenceUrl : presenceUrl.charAt(presenceUrl.length() -1) == '/' ? presenceUrl : String.format("%s/", presenceUrl);
+						
+				        // CAUSE: Prefer String.format to +
+				        presenceUrl += String.format("presence/disable/%s/%s", applicationKey, channel);
+						
+				        // CAUSE: Prefer String.format to +
+				        String content = String.format("privatekey=%s", privateKey);
+						
+						try {
+							URL requestUrl = new URL(presenceUrl);
+							
+							RestWebservice.postAsync(requestUrl,content, proxy, new OnRestWebserviceResponse() {
+								
+								@Override
+								public void run(Exception error, String response) {
+									if(error != null){
+										callback.run(error, null);
+									}else{
+										callback.run(null, response);
+									}					
+								}
+							});			
+				        } catch (IOException e) {
+							callback.run(e, null);
+						}
+					}
 				}
-			});			
-        } catch (IOException e) {
+			});
+		} catch (MalformedURLException e) {
 			callback.run(e, null);
 		}
 	}

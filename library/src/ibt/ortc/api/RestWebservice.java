@@ -58,13 +58,7 @@ public class RestWebservice {
     String result = "";
 
     try {
-      //connection = (HttpURLConnection) url.openConnection();
-      if(proxy.isDefined()){
-			java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
-			connection = (HttpURLConnection) url.openConnection(jnp);
-		} else {
-			connection = (HttpURLConnection) url.openConnection();
-		}
+      connection = (HttpURLConnection) url.openConnection();
       InputStream responseBody;
       if (connection.getResponseCode() != 200 && connection.getResponseCode() != -1) {
         responseBody = connection.getErrorStream();
@@ -96,11 +90,11 @@ public class RestWebservice {
     try {
       //connection = (HttpsURLConnection) url.openConnection();
       if(proxy.isDefined()){
-			java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
-			connection = (HttpsURLConnection) url.openConnection(jnp);
-		} else {
-			connection = (HttpsURLConnection) url.openConnection();
-		}
+        java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
+        connection = (HttpsURLConnection) url.openConnection(jnp);
+      } else {
+        connection = (HttpsURLConnection) url.openConnection();
+      }
       BufferedReader rd = null;
 
       try {
@@ -146,11 +140,11 @@ public class RestWebservice {
     try {
       //connection = (HttpURLConnection) url.openConnection();
       if(proxy.isDefined()){
-			java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
-			connection = (HttpURLConnection) url.openConnection(jnp);
-		} else {
-			connection = (HttpURLConnection) url.openConnection();
-		}
+        java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
+        connection = (HttpURLConnection) url.openConnection(jnp);
+      } else {
+        connection = (HttpURLConnection) url.openConnection();
+      }
       connection.setRequestMethod("POST");
       connection.setDoOutput(true);
 
@@ -171,7 +165,7 @@ public class RestWebservice {
 
       BufferedReader rd = null;
       try {
-        if (connection.getResponseCode() != 200) {
+    	  if (connection.getResponseCode() < 200 || connection.getResponseCode() > 299) {
           // CAUSE: Reliance on default encoding
           rd = new BufferedReader(new InputStreamReader(connection.getErrorStream(), "UTF-8"));
           String line = rd.readLine();
@@ -216,11 +210,11 @@ public class RestWebservice {
     try {
       //connection = (HttpsURLConnection) url.openConnection();
       if(proxy.isDefined()){
-			java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
-			connection = (HttpsURLConnection) url.openConnection(jnp);
-		} else {
-			connection = (HttpsURLConnection) url.openConnection();
-		}
+        java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
+        connection = (HttpsURLConnection) url.openConnection(jnp);
+      } else {
+        connection = (HttpsURLConnection) url.openConnection();
+      }
       connection.setRequestMethod("POST");
       connection.setDoOutput(true);
 
@@ -241,8 +235,8 @@ public class RestWebservice {
 
       BufferedReader rd = null;
       try {
-        if (connection.getResponseCode() != 200) {
-          // CAUSE: Reliance on default encoding
+        if (connection.getResponseCode() < 200 || connection.getResponseCode() > 299) {
+          // CAUSE: Reliance on default encoding        	
           rd = new BufferedReader(new InputStreamReader(connection.getErrorStream(), "UTF-8"));
           String line = rd.readLine();
           while (line != null) {

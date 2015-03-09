@@ -6,14 +6,15 @@
 import ibt.ortc.api.*;
 import ibt.ortc.extensibility.*;
 
+import java.awt.*;
 import java.util.*;
 
 public class Main {
 
     private static final String defaultServerUrl = "http://ortc-developers.realtime.co/server/2.1";
     private static final boolean defaultIsBalancer = true;
-    private static final String defaultApplicationKey = "YOUR_APPLICATION_KEY";
-    private static final String defaultPrivateKey = "YOUR_APPLICATION_PRIVATE_KEY";
+    private static final String defaultApplicationKey = "u0jw09";
+    private static final String defaultPrivateKey = "jYuVOxnEuVC2";
     private static final String defaultAuthenticationToken = "RealtimeDemo";
     private static final boolean defaultNeedsAuthentication = false;
     private static String serverUrl;
@@ -210,7 +211,7 @@ public class Main {
     }
 
     private static void disablePresence(String channel){
-        Ortc.disablePresence(serverUrl, isBalancer, applicationKey, defaultPrivateKey, channel, new OnDisablePresence() {
+        Ortc.disablePresence(serverUrl, isBalancer, applicationKey, defaultPrivateKey, channel,new OnDisablePresence() {
 
             @Override
             public void run(Exception error, String result) {
@@ -270,6 +271,8 @@ public class Main {
 
         final OrtcClient client = factory.createClient();
 
+        client.setHeartbeatActive(false);
+
         if (isBalancer) {
             client.setClusterUrl(serverUrl);
         } else {
@@ -282,9 +285,13 @@ public class Main {
             @Override
             public void run(OrtcClient sender) {
                 System.out.println(String.format("Connected to %s", client.getUrl()));
-
-                interfaceMenu();
-                readMenuCommand(client);
+                EventQueue.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        interfaceMenu();
+                        readMenuCommand(client);
+                    }
+                });
             }
         };
 
@@ -292,7 +299,13 @@ public class Main {
             @Override
             public void run(OrtcClient send, Exception ex) {
                 System.out.println(String.format("Error: '%s'", ex.toString()));
-                readMenuCommand(client);
+                EventQueue.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        readMenuCommand(client);
+                    }
+                });
+                //readMenuCommand(client);
             }
         };
 
@@ -300,7 +313,13 @@ public class Main {
             @Override
             public void run(OrtcClient sender) {
                 System.out.println("Disconnected");
-                readMenuCommand(client);
+                EventQueue.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        readMenuCommand(client);
+                    }
+                });
+                //readMenuCommand(client);
             }
         };
 
@@ -330,11 +349,18 @@ public class Main {
             @Override
             public void run(OrtcClient sender, String channel) {
                 System.out.println(String.format("Unsubscribed from channel %s", channel));
-                readMenuCommand(client);
+                EventQueue.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        readMenuCommand(client);
+                    }
+                });
             }
         };
 
         System.out.println("Connecting...");
+        client.setConnectionMetadata("JavaApp");
+        client.setHeartbeatActive(true);
         client.connect(applicationKey, authenticationToken);
     }
 }

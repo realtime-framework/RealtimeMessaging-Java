@@ -4,6 +4,9 @@
  */
 package ibt.ortc.extensibility;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Class that represents a channel subscription
  *  
@@ -24,11 +27,15 @@ public class ChannelSubscription {
 	/**
 	 * Creates an instance of a channel subscription
 	 * @param subscribeOnReconnected Indicates if the channel should be subscribe if a reconnect happens
-	 * @param onMessage Event handler that is fired when a message is received in the channel
+	 * @param onMessageT Event handler that is fired when a message is received in the channel
 	 */
-	public ChannelSubscription(boolean subscribeOnReconnected,OnMessage onMessage){
+	public <T> ChannelSubscription(boolean subscribeOnReconnected,T onMessageT){
 		this.subscribeOnReconnected = subscribeOnReconnected;
-		this.onMessage = onMessage;
+
+		if(onMessageT instanceof OnMessage){
+			this.onMessage = (OnMessage) onMessageT;
+		}
+
 		this.isSubscribed = false;
 		this.isSubscribing = false;
 	}
@@ -66,13 +73,15 @@ public class ChannelSubscription {
 	}
 
 	/**
-	 * Gets the event handler that is fired when a message is received in the channel
-	 * @return OnMessage event handler of a message received in the channel
+	 * Fires the event handler that is associated the subscribed channel (with payload)
+	 * @param channel 
+	 * @param sender
+	 * @param message
 	 */
-	public OnMessage getOnMessage() {
-		return onMessage;
+	public void runHandler(OrtcClient sender, String channel, String message){
+			this.onMessage.run(sender, channel, message);
 	}
-
+	
 	/**
 	 * Indicates where the channel should be subscribed if a reconnect happens
 	 * @return boolean True if should be subscribed otherwise false
@@ -87,4 +96,5 @@ public class ChannelSubscription {
 	public void setSubscribeOnReconnected(boolean value) {
 		subscribeOnReconnected = value;
 	}
+
 }
