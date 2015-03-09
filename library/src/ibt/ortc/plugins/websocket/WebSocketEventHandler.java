@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2011 Roderick Baier
+ *  Copyright (C) 2012 Roderick Baier
  *  
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -16,10 +16,29 @@
 
 package ibt.ortc.plugins.websocket;
 
+import java.io.IOException;
+
 
 public interface WebSocketEventHandler
 {
 	public void onOpen();
+	
+	
 	public void onMessage(WebSocketMessage message);
+	
+	
+	//public void onError(IOException exception);
+	
+	
 	public void onClose();
+
+	public void onForcedClose();
+	
+	
+	public void onPing();
+	
+	
+	public void onPong();
+
+	public void onException(Exception error);
 }
