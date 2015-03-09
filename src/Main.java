@@ -13,8 +13,8 @@ public class Main {
 
     private static final String defaultServerUrl = "http://ortc-developers.realtime.co/server/2.1";
     private static final boolean defaultIsBalancer = true;
-    private static final String defaultApplicationKey = "u0jw09";
-    private static final String defaultPrivateKey = "jYuVOxnEuVC2";
+    private static final String defaultApplicationKey = "YOUR_APPLICATION_KEY";
+    private static final String defaultPrivateKey = "YOUR_PRIVATE_KEY";
     private static final String defaultAuthenticationToken = "RealtimeDemo";
     private static final boolean defaultNeedsAuthentication = false;
     private static String serverUrl;
