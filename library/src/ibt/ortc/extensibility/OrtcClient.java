@@ -4,268 +4,32 @@
  */
 package ibt.ortc.extensibility;
 
-import ibt.ortc.api.Balancer;
-import ibt.ortc.api.InvalidBalancerServerException;
-import ibt.ortc.api.OnDisablePresence;
-import ibt.ortc.api.OnEnablePresence;
-import ibt.ortc.api.OnPresence;
-import ibt.ortc.api.Ortc;
-import ibt.ortc.api.Pair;
-import ibt.ortc.api.Proxy;
-import ibt.ortc.api.Strings;
+import ibt.ortc.api.*;
 import ibt.ortc.extensibility.exception.OrtcAlreadyConnectedException;
 import ibt.ortc.extensibility.exception.OrtcDoesNotHavePermissionException;
 import ibt.ortc.extensibility.exception.OrtcEmptyFieldException;
+import ibt.ortc.extensibility.exception.OrtcGcmException;
 import ibt.ortc.extensibility.exception.OrtcInvalidCharactersException;
 import ibt.ortc.extensibility.exception.OrtcMaxLengthException;
 import ibt.ortc.extensibility.exception.OrtcNotConnectedException;
 import ibt.ortc.extensibility.exception.OrtcNotSubscribedException;
 import ibt.ortc.extensibility.exception.OrtcSubscribedException;
+
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Set;
+
 
 /**
  * Abstract class representing an Ortc Client
- * 
- * <br>
- * <b>How to use in android:<b>
- * 
- * <pre>
- * try {
- * 	Ortc ortc = new Ortc();
- * 
- * 	OrtcFactory factory;
- * 
- * 	factory = ortc.loadOrtcFactory(&quot;IbtRealtimeSJ&quot;);
- * 
- * 	client = factory.createClient();
- * 
- * 	HashMap&lt;String, ChannelPermissions&gt; permissions = new HashMap&lt;String, ChannelPermissions&gt;();
- * 	permissions.put(&quot;channel1:*&quot;, ChannelPermissions.Write);
- * 	permissions.put(&quot;channel1&quot;, ChannelPermissions.Write);
- * 
- * 	if (!Ortc.saveAuthentication(
- * 			&quot;http://ortc-developers.realtime.co/server/2.1/&quot;, true,
- * 			&quot;SessionId&quot;, false, &quot;APPKEY&quot;, 1800, &quot;PVTKEY&quot;, permissions)) {
- * 		throw new Exception(&quot;Was not possible to authenticate&quot;);
- * 	}
- * 
- * 	client.setClusterUrl(defaultServerUrl);
- * 	client.setConnectionMetadata(&quot;DroidApp&quot;);
- * 
- * 	client.onConnected = new OnConnected() {
- * 		&#064;Override
- * 		public void run(final Object sender) {
- * 			runOnUiThread(new Runnable() {
- * 				&#064;Override
- * 				public void run() {
- * 					TextView t = ((TextView) findViewById(R.id.TextViewTitle));
- * 					t.setText(&quot;Client connected to: &quot;
- * 							+ ((OrtcClient) sender).getUrl());
- * 				}
- * 			});
- * 		}
- * 	};
- * 
- * 	client.onDisconnected = new OnDisconnected() {
- * 		&#064;Override
- * 		public void run(Object arg0) {
- * 			runOnUiThread(new Runnable() {
- * 				&#064;Override
- * 				public void run() {
- * 					TextView t = ((TextView) findViewById(R.id.TextViewTitle));
- * 					t.setText(&quot;Client disconnected&quot;);
- * 				}
- * 			});
- * 		}
- * 	};
- * 
- * 	client.onSubscribed = new OnSubscribed() {
- * 		&#064;Override
- * 		public void run(Object sender, String channel) {
- * 			final String subscribedChannel = channel;
- * 			runOnUiThread(new Runnable() {
- * 				&#064;Override
- * 				public void run() {
- * 					TextView textViewLog = (TextView) findViewById(R.id.TextViewLog);
- * 					textViewLog.append(String.format(&quot;Channel subscribed %s\n&quot;,
- * 							subscribedChannel));
- * 				}
- * 			});
- * 		}
- * 	};
- * 
- * 	client.onUnsubscribed = new OnUnsubscribed() {
- * 		&#064;Override
- * 		public void run(Object sender, String channel) {
- * 			final String subscribedChannel = channel;
- * 			runOnUiThread(new Runnable() {
- * 				&#064;Override
- * 				public void run() {
- * 					TextView textViewLog = (TextView) findViewById(R.id.TextViewLog);
- * 					textViewLog.append(String.format(
- * 							&quot;Channel unsubscribed %s\n&quot;, subscribedChannel));
- * 				}
- * 			});
- * 		}
- * 	};
- * 
- * 	client.onException = new OnException() {
- * 		&#064;Override
- * 		public void run(Object send, Exception ex) {
- * 			final Exception exception = ex;
- * 			runOnUiThread(new Runnable() {
- * 				&#064;Override
- * 				public void run() {
- * 					TextView textViewLog = (TextView) findViewById(R.id.TextViewLog);
- * 					textViewLog.append(String.format(&quot;Ortc Error: %s\n&quot;,
- * 							exception.getMessage()));
- * 				}
- * 			});
- * 		}
- * 	};
- * 
- * 	client.onReconnected = new OnReconnected() {
- * 		&#064;Override
- * 		public void run(final Object sender) {
- * 			runOnUiThread(new Runnable() {
- * 				&#064;Override
- * 				public void run() {
- * 					reconnectingTries = 0;
- * 					TextView textViewLog = (TextView) findViewById(R.id.TextViewTitle);
- * 					textViewLog.setText(&quot;Client reconnected to: &quot;
- * 							+ ((OrtcClient) sender).getUrl());
- * 				}
- * 			});
- * 		}
- * 	};
- * 
- * 	client.onReconnecting = new OnReconnecting() {
- * 		&#064;Override
- * 		public void run(Object sender) {
- * 			runOnUiThread(new Runnable() {
- * 				&#064;Override
- * 				public void run() {
- * 					reconnectingTries++;
- * 					TextView textViewLog = (TextView) findViewById(R.id.TextViewTitle);
- * 					textViewLog.setText(String.format(&quot;Client reconnecting %s&quot;,
- * 							reconnectingTries));
- * 				}
- * 			});
- * 		}
- * 	};
- * 
- * 	client.connect(defaultApplicationKey, defaultAuthenticationToken);
- * 
- * } catch (Exception e) {
- * 	System.out.println(&quot;ORTC ERROR: &quot; + e.toString());
- * }
- * </pre>
- * 
- * <br>
- * <b>How to use in java:<b>
- * 
- * <pre>
- * try {
- * 	boolean isBalancer = true;
- * 
- * 	Ortc api = new Ortc();
- * 
- * 	OrtcFactory factory = api.loadOrtcFactory(&quot;IbtRealtimeSJ&quot;);
- * 
- * 	final OrtcClient client = factory.createClient();
- * 
- * 	if (isBalancer) {
- * 		client.setClusterUrl(serverUrl);
- * 	} else {
- * 		client.setUrl(serverUrl);
- * 	}
- * 
- * 	System.out.println(String.format(&quot;Connecting to server %s&quot;, serverUrl));
- * 
- * 	client.onConnected = new OnConnected() {
- * 		&#064;Override
- * 		public void run(Object sender) {
- * 			System.out
- * 					.println(String.format(&quot;Connected to %s&quot;, client.getUrl()));
- * 
- * 			client.subscribe(&quot;channel1&quot;, true, new OnMessage() {
- * 				&#064;Override
- * 				public void run(Object sender, String channel, String message) {
- * 					System.out.println(String.format(
- * 							&quot;Message received on channel %s: '%s'&quot;, channel,
- * 							message));
- * 
- * 					((OrtcClient) sender).send(channel, &quot;Echo &quot; + message);
- * 				}
- * 			});
- * 		}
- * 	};
- * 
- * 	client.onException = new OnException() {
- * 		&#064;Override
- * 		public void run(Object send, Exception ex) {
- * 			System.out.println(String.format(&quot;Error: '%s'&quot;, ex.toString()));
- * 		}
- * 	};
- * 
- * 	client.onDisconnected = new OnDisconnected() {
- * 		&#064;Override
- * 		public void run(Object sender) {
- * 			System.out.println(&quot;Disconnected&quot;);
- * 		}
- * 	};
- * 
- * 	client.onReconnected = new OnReconnected() {
- * 		&#064;Override
- * 		public void run(Object sender) {
- * 			System.out.println(String.format(&quot;Reconnected to %s&quot;,
- * 					client.getUrl()));
- * 		}
- * 	};
- * 
- * 	client.onReconnecting = new OnReconnecting() {
- * 		&#064;Override
- * 		public void run(Object sender) {
- * 			System.out.println(String.format(&quot;Reconnecting to %s&quot;,
- * 					client.getUrl()));
- * 		}
- * 	};
- * 
- * 	client.onSubscribed = new OnSubscribed() {
- * 		&#064;Override
- * 		public void run(Object sender, String channel) {
- * 			System.out.println(String.format(&quot;Subscribed to channel %s&quot;,
- * 					channel));
- * 		}
- * 	};
- * 
- * 	client.onUnsubscribed = new OnUnsubscribed() {
- * 		&#064;Override
- * 		public void run(Object sender, String channel) {
- * 			System.out.println(String.format(&quot;Unsubscribed from channel %s&quot;,
- * 					channel));
- * 		}
- * 	};
- * 
- * 	System.out.println(&quot;Connecting...&quot;);
- * 	client.connect(&quot;APPLICATION_KEY&quot;, &quot;AUTHENTICATION_TOKEN&quot;);
- * 
- * } catch (Exception e) {
- * 	System.out.println(&quot;ORTC ERROR: &quot; + e.toString());
- * }
- * </pre>
- * 
- * @version 2.1.0 23 Mar 2013
- * @author IBT
- * 
  */
 public abstract class OrtcClient {
 
@@ -275,13 +39,17 @@ public abstract class OrtcClient {
 	protected static final int MAX_CHANNEL_SIZE = 100;
 	public static final int MAX_CONNECTION_METADATA_SIZE = 256;
 	protected static final int CONNECTION_TIMEOUT_DEFAULT_VALUE = 5000;
-	
+
 	// ========== Constants ==========
 
 	// ========== Enumerators ==========
 
 	private enum ChannelPermission {
 		Read, Write
+	}
+
+	private enum AnnouncementChannels {
+		ortcClientConnected, ortcClientDisconnected, ortcClientSubscribed, ortcClientUnsubscribed
 	}
 
 	// ========== Enumerators ==========
@@ -378,7 +146,7 @@ public abstract class OrtcClient {
 	protected Hashtable<String, ChannelSubscription> subscribedChannels;
 	protected Hashtable<String, String> channelsPermissions;
 
-	private Hashtable<String, LinkedList<BufferedMessage>> multiPartMessagesBuffer;
+	protected Hashtable<String, LinkedList<BufferedMessage>> multiPartMessagesBuffer;
 
 	private boolean isCluster;
 
@@ -386,14 +154,27 @@ public abstract class OrtcClient {
 	protected boolean isDisconnecting;
 	protected boolean isReconnecting;
 	protected boolean isConnecting;
-	
-	protected Proxy proxy;	
 
-	
+	protected static final int heartbeatMaxTime = 60;
+	protected static final int heartbeatMinTime = 10;
+
+	protected static final int heartbeatMaxFails = 6;
+	protected static final int heartbeatMinFails = 1;
+
+	protected boolean heartbeatActive = false;
+	protected int heartbeatFails = 3;
+	protected int heartbeatTime = 15;
+	protected HeartbeatSender heartbeatSender = null;
+
+	protected DispatchedMessages dispatchedMessages;
+
+	protected Proxy proxy;
+
+
 	// ========== Properties ==========
 
 	// ========== Construtctor ==========
-	
+
 	/**
 	 * Creates an instance of Ortc Client
 	 */
@@ -404,12 +185,13 @@ public abstract class OrtcClient {
 		this.isDisconnecting = false;
 		this.isReconnecting = false;
 		this.isConnecting = false;
-		this.proxy = new Proxy();
 
 		this.subscribedChannels = new Hashtable<String, ChannelSubscription>(11);
 		this.channelsPermissions = new Hashtable<String, String>(11);
 		this.multiPartMessagesBuffer = new Hashtable<String, LinkedList<BufferedMessage>>(
 				11);
+		this.dispatchedMessages = new DispatchedMessages();
+		this.proxy = new Proxy();
 	}
 
 	// ========== Construtctor ==========
@@ -429,7 +211,8 @@ public abstract class OrtcClient {
 	 *            be generated by the application, such as session id for
 	 *            example.
 	 */
-	public void connect(final String applicationKey, final String authenticationToken) {
+	public void connect(final String applicationKey,
+			final String authenticationToken) {
 		/*
 		 * Sanity checks
 		 */
@@ -475,50 +258,49 @@ public abstract class OrtcClient {
 					new OrtcNotConnectedException("Already trying to connect"));
 		} else {
 			final OrtcClient self = this;
-			new Thread(new Runnable() {        
-        @Override
-        public void run() {
-          Exception e = null;
-          try {
-            if(!isReconnecting){
-              self.isConnecting = true;
-            }       
-            self.applicationKey = applicationKey;
-            self.authenticationToken = authenticationToken;
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					Exception e = null;
+					try {
+						if (!isReconnecting) {
+							self.isConnecting = true;
+						}
+						self.applicationKey = applicationKey;
+						self.authenticationToken = authenticationToken;
 
-            if (self.isCluster) {
-              String clusterServer = Balancer.getServerFromBalancer(
-                  self.clusterUrl, self.applicationKey, self.proxy);
-              self.setUrl(clusterServer);
-              self.isCluster = true;
-            }
+						if (self.isCluster) {
+							String clusterServer = Balancer
+									.getServerFromBalancer(self.clusterUrl,
+											self.applicationKey, self.proxy);
+							self.setUrl(clusterServer);
+							self.isCluster = true;
+						}
 
-            self.uri = new URI(self.url);
-            self.protocol = "http".equals(uri.getScheme()) ? ConnectionProtocol.Unsecure
-                : ConnectionProtocol.Secure;
-            
-            self.connect();
-          } 
-          catch (IllegalArgumentException ex) {
-             e = ex;
-          }
-          catch (URISyntaxException ex) {
-            e = ex;
-          } catch (MalformedURLException ex) {
-            e = ex;
-          } catch (IOException ex) {
-            e = ex;
-          } catch (InvalidBalancerServerException ex) {
-            e = ex;
-          } finally {
-            if (e != null) {          
-              self.isReconnecting = true;
-              self.raiseOrtcEvent(EventEnum.OnException, self, new Exception("Unable to connect"));    
-              self.raiseOrtcEvent(EventEnum.OnReconnecting, self);                
-            }
-          }
-        }
-      }).start();
+						self.uri = new URI(self.url);
+						self.protocol = "http".equals(uri.getScheme()) ? ConnectionProtocol.Unsecure
+								: ConnectionProtocol.Secure;
+
+						self.connect();
+					} catch (URISyntaxException ex) {
+						e = ex;
+					} catch (MalformedURLException ex) {
+						e = ex;
+					} catch (IOException ex) {
+						e = ex;
+					} catch (InvalidBalancerServerException ex) {
+						e = ex;
+					} finally {
+						if (e != null) {
+							self.isReconnecting = true;
+							self.raiseOrtcEvent(EventEnum.OnException, self,
+									new Exception("Unable to connect"));
+							self.raiseOrtcEvent(EventEnum.OnReconnecting, self);
+							
+						}
+					}
+				}
+			}).start();
 		}
 	}
 
@@ -527,7 +309,26 @@ public abstract class OrtcClient {
 	/**
 	 * Closes the current connection
 	 */
-	public abstract void disconnect();
+	public void disconnect() {		
+		if(!isConnected){
+			if(this.isReconnecting){
+				stopReconnecting();
+				this.isConnecting = false;
+			} else {
+				raiseOrtcEvent(EventEnum.OnException,this, new OrtcNotConnectedException());
+			}
+		}else{
+			stopHeartBeatInterval();
+			/*if (appContext != null && !googleProjectId.isEmpty()
+					&& !isDisconnecting) {
+				this.intentService.removeServiceOrtcClient(this);
+				this.appContext.unbindService(this.intentServiceConnection);
+			}*/
+			this.disconnectIntern();
+		}
+	}
+
+	protected abstract void disconnectIntern();
 
 	private Pair<Boolean, String> channelHasPermission(String channelName,
 			ChannelPermission permission) {
@@ -549,6 +350,23 @@ public abstract class OrtcClient {
 
 			result = new Pair<Boolean, String>(!Strings.isNullOrEmpty(hash),
 					hash);
+		} else {
+			if (permission == ChannelPermission.Write) {
+				int domainChannelCharacterIndex = channelName.indexOf(':');
+				String channelToValidate = channelName;
+
+				if (domainChannelCharacterIndex > 0) {
+					channelToValidate = channelName.substring(0,
+							domainChannelCharacterIndex);
+				}
+
+				try {
+					AnnouncementChannels.valueOf(channelToValidate);
+					result.first = false;
+				} catch (Exception e) {
+
+				}
+			}
 		}
 
 		if (!result.first) {
@@ -563,7 +381,7 @@ public abstract class OrtcClient {
 		return result;
 	}
 
-	private Pair<Boolean, String> isSendValid(String channelName, String message, String applicationKey, String privateKey) {
+	private Pair<Boolean, String> isSendValid(String channelName, String message) {
 		// NOTE: Sanity check for send method
 		Pair<Boolean, String> result = new Pair<Boolean, String>(true, null);
 
@@ -589,7 +407,7 @@ public abstract class OrtcClient {
 			result.first = false;
 		}
 
-		if (result.first && Strings.isNullOrEmpty(applicationKey) && Strings.isNullOrEmpty(privateKey)) {
+		if (result.first) {
 			Pair<Boolean, String> channelPermission = channelHasPermission(
 					channelName, ChannelPermission.Write);
 			result.first = channelPermission.first;
@@ -609,7 +427,7 @@ public abstract class OrtcClient {
 	 */
 	public void send(String channel, String message) {
 		// CAUSE: Assignment to method parameter
-		Pair<Boolean, String> sendValidation = isSendValid(channel, message, null, null);
+		Pair<Boolean, String> sendValidation = isSendValid(channel, message);
 
 		//String lMessage = message.replace("\n", "\\n");
 
@@ -627,10 +445,10 @@ public abstract class OrtcClient {
 			}
 		}
 	}
-	
+
 	public void sendProxy(String applicationKey, String privateKey, String channel, String message) {
 		// CAUSE: Assignment to method parameter
-		Pair<Boolean, String> sendValidation = isSendValid(channel, message, applicationKey,privateKey);
+		Pair<Boolean, String> sendValidation = isSendValid(channel, message);
 
 		//String lMessage = message.replace("\n", "\\n");
 
@@ -689,12 +507,12 @@ public abstract class OrtcClient {
 
 	protected abstract void send(String channel, String message,
 			String messagePartIdentifier, String permission);
-	
+
 	protected abstract void send(String applicationKey, String privateKey, String channel, String message,
-			String messagePartIdentifier, String permission);
+								 String messagePartIdentifier, String permission);
 
 	private Pair<Boolean, String> isSubscribeValid(String channelName,
-			ChannelSubscription channel) {
+			ChannelSubscription channel, Boolean isWithNotifications) {
 		// NOTE: Sanity check for subscribe method
 		Pair<Boolean, String> result = new Pair<Boolean, String>(true, null);
 
@@ -709,7 +527,13 @@ public abstract class OrtcClient {
 			raiseOrtcEvent(EventEnum.OnException, this,
 					new OrtcEmptyFieldException("Channel"));
 			result.first = false;
-		} else if (!Strings.ortcIsValidInput(channelName)) {
+		} else if (!isWithNotifications
+				&& !Strings.ortcIsValidInput(channelName)) {
+			raiseOrtcEvent(EventEnum.OnException, this,
+					new OrtcInvalidCharactersException("Channel"));
+			result.first = false;
+		} else if (isWithNotifications
+				&& !Strings.ortcIsValidChannelForNotifications(channelName)) {
 			raiseOrtcEvent(EventEnum.OnException, this,
 					new OrtcInvalidCharactersException("Channel"));
 			result.first = false;
@@ -757,13 +581,19 @@ public abstract class OrtcClient {
 	 */
 	public void subscribe(String channel, boolean subscribeOnReconnect,
 			OnMessage onMessage) {
+		resolveSubscriptionChannels(channel, subscribeOnReconnect, onMessage,
+				false);
+	}
+
+	private <T> void resolveSubscriptionChannels(String channel,
+			boolean subscribeOnReconnect, T onMessage,
+			boolean withNotification) {
 		ChannelSubscription subscribedChannel = subscribedChannels.get(channel);
 		Pair<Boolean, String> subscribeValidation = isSubscribeValid(channel,
-				subscribedChannel);
+				subscribedChannel, withNotification);
 
 		if (subscribeValidation != null && subscribeValidation.first) {
-			subscribedChannel = new ChannelSubscription(subscribeOnReconnect,
-					onMessage);
+			subscribedChannel = new ChannelSubscription(subscribeOnReconnect, onMessage);
 			subscribedChannel.setSubscribing(true);
 			subscribedChannels.put(channel, subscribedChannel);
 
@@ -860,7 +690,7 @@ public abstract class OrtcClient {
 	 *            Channel with presence data active.
 	 * @param callback
 	 *            Callback with error and result.
-	 * @throws ibt.ortc.extensibility.exception.OrtcNotConnectedException
+	 * @throws OrtcNotConnectedException
 	 */
 	public void presence(String channel, OnPresence callback)
 			throws OrtcNotConnectedException {
@@ -869,7 +699,8 @@ public abstract class OrtcClient {
 		} else {
 			String presenceUrl = this.isCluster ? this.clusterUrl : this.url;
 
-			Ortc.presence(presenceUrl, this.isCluster, this.applicationKey, this.authenticationToken, channel, this.proxy, callback);
+			Ortc.presence(presenceUrl, this.isCluster, this.applicationKey,
+					this.authenticationToken, channel, this.proxy, callback);
 		}
 	}
 
@@ -899,7 +730,7 @@ public abstract class OrtcClient {
 	 *            Defines if to collect first 100 unique metadata.
 	 * @param callback
 	 *            Callback with error and result.
-	 * @throws ibt.ortc.extensibility.exception.OrtcNotConnectedException
+	 * @throws OrtcNotConnectedException
 	 */
 	public void enablePresence(String privateKey, String channel,
 			Boolean metadata, OnEnablePresence callback)
@@ -909,7 +740,9 @@ public abstract class OrtcClient {
 		} else {
 			String presenceUrl = this.isCluster ? this.clusterUrl : this.url;
 
-			Ortc.enablePresence(presenceUrl, this.isCluster, this.applicationKey, privateKey, channel, metadata, this.proxy, callback);
+			Ortc.enablePresence(presenceUrl, this.isCluster,
+					this.applicationKey, privateKey, channel, metadata,
+					this.proxy,callback);
 		}
 	}
 
@@ -936,7 +769,7 @@ public abstract class OrtcClient {
 	 *            Channel to disable presence
 	 * @param callback
 	 *            Callback with error and result.
-	 * @throws ibt.ortc.extensibility.exception.OrtcNotConnectedException
+	 * @throws OrtcNotConnectedException
 	 */
 	public void disablePresence(String privateKey, String channel,
 			OnDisablePresence callback) throws OrtcNotConnectedException {
@@ -945,7 +778,8 @@ public abstract class OrtcClient {
 		} else {
 			String presenceUrl = this.isCluster ? this.clusterUrl : this.url;
 
-			Ortc.disablePresence(presenceUrl, this.isCluster, this.applicationKey, privateKey, channel, this.proxy, callback);
+			Ortc.disablePresence(presenceUrl, this.isCluster,
+					this.applicationKey, privateKey, channel, this.proxy, callback);
 		}
 	}
 
@@ -959,7 +793,7 @@ public abstract class OrtcClient {
 	 * @return boolean True if the channel is subscribed otherwise false
 	 */
 	public Boolean isSubscribed(String channel) {
-		Boolean result = null;
+		Boolean result = false;
 
 		/*
 		 * Sanity checks
@@ -1112,14 +946,14 @@ public abstract class OrtcClient {
 
 	/**
 	 * Defines the proxy connection settings for the ortc client
-	 * 
+	 *
 	 * @param proxyHost Proxy host
 	 * @param proxyPort Proxy port
 	 */
 	public void useProxy(String proxyHost, int proxyPort){
-		this.proxy = new Proxy(proxyHost, proxyPort);	
+		this.proxy = new Proxy(proxyHost, proxyPort);
 	}
-	
+
 	// ========== Getters and Setters ==========
 
 	// ========== Raise of events ==========
@@ -1155,48 +989,50 @@ public abstract class OrtcClient {
 
 	private void raiseOnConnected(Object... args) {
 		this.isConnected = true;
-		this.isDisconnecting = false;		
-		if (isReconnecting && !isConnecting) {		  
+		this.isDisconnecting = false;
+		if (isReconnecting && !isConnecting) {
 			raiseOrtcEvent(EventEnum.OnReconnected, args);
 		} else {
-		  this.isConnecting = false;
+			this.isConnecting = false;
+			this.isReconnecting = false;
 			if (onConnected != null) {
-				OrtcClient sender = args != null
-						&& args.length == 1 ? (OrtcClient) args[0] : null;
+				OrtcClient sender = (OrtcClient) (args != null
+						&& args.length == 1 ? args[0] : null);
 
 				onConnected.run(sender);
+				startHeartBeatInterval();
 			}
 		}
 
 	}
 
 	private void raiseOnDisconnected(Object... args) {
-		OrtcClient sender = args != null && args.length == 1 ? (OrtcClient) args[0]
-				: null;
+		stopHeartBeatInterval();
+		OrtcClient sender = (OrtcClient) (args != null && args.length == 1 ? args[0]
+				: null);
 		this.channelsPermissions = new Hashtable<String, String>(11);
-		if (isDisconnecting || isConnecting) {
+		if (isDisconnecting) {
 			this.isConnected = false;
 			this.isDisconnecting = false;
 			this.isConnecting = false;
+			this.isReconnecting = false;
 			this.subscribedChannels = new Hashtable<String, ChannelSubscription>(
 					11);
 			if (onDisconnected != null) {
 				onDisconnected.run(sender);
 			}
-		} else {
-		  if(!isReconnecting){
-		    if (onDisconnected != null) {
-	        onDisconnected.run(sender);
-	      }
-		  }
+		} else if(isReconnecting){			
+			if (onDisconnected != null) {
+				onDisconnected.run(sender);
+			}
 			raiseOrtcEvent(EventEnum.OnReconnecting, args);
 		}
 	}
 
 	private void raiseOnException(Object... args) {
 		if (onException != null) {
-			OrtcClient sender = args != null && args.length == 2 ? (OrtcClient) args[0]
-					: null;
+			OrtcClient sender = (OrtcClient) (args != null && args.length == 2 ? args[0]
+					: null);
 			Exception exception = args != null && args.length == 2 ? (Exception) args[1]
 					: null;
 			onException.run(sender, exception);
@@ -1222,6 +1058,8 @@ public abstract class OrtcClient {
 
 				if (channelPermission != null && channelPermission.first) {
 					subscribe(channelName, channelPermission.second);
+				}else{
+					subscribedChannel.setSubscribing(false);
 				}
 			} else {
 				channelsToRemove.add(channelName);
@@ -1233,38 +1071,42 @@ public abstract class OrtcClient {
 		}
 
 		if (onReconnected != null) {
-			OrtcClient sender = args != null && args.length == 1 ? (OrtcClient) args[0]
-					: null;
+			OrtcClient sender = (OrtcClient) (args != null && args.length == 1 ? args[0]
+					: null);
+
 			onReconnected.run(sender);
+			startHeartBeatInterval();
 		}
 	}
 
-	private void raiseOnReconnecting(Object... args) {		  
-		if (isReconnecting) {
+	private void raiseOnReconnecting(Object... args) {
+		stopHeartBeatInterval();
+		if (this.isReconnecting) {
 			try {
 				Thread.sleep(this.connectionTimeout);
 			} catch (InterruptedException e) {
 				raiseOrtcEvent(EventEnum.OnException, this, e);
 			}
+
+			if (this.isReconnecting) {
+				this.isConnected = false;
+				this.isDisconnecting = false;
+
+				if (onReconnecting != null) {
+					OrtcClient sender = (OrtcClient) (args != null
+							&& args.length == 1 ? args[0] : null);
+					onReconnecting.run(sender);
+				}
+
+				this.connect(this.applicationKey, this.authenticationToken);
+			}
 		}
-
-		this.isConnected = false;
-		this.isDisconnecting = false;
-		this.isReconnecting = true;		
-
-		if (onReconnecting != null) {
-			OrtcClient sender = args != null && args.length == 1 ? (OrtcClient)  args[0]
-					: null;
-			onReconnecting.run(sender);
-		}
-
-		this.connect(this.applicationKey, this.authenticationToken);
 	}
 
 	private void raiseOnSubscribed(Object... args) {
 
-		OrtcClient sender = args != null && args.length == 2 ? (OrtcClient) args[0]
-				: null;
+		OrtcClient sender = (OrtcClient) (args != null && args.length == 2 ? args[0]
+				: null);
 		String channel = args != null && args.length == 2 ? (String) args[1]
 				: null;
 
@@ -1279,8 +1121,8 @@ public abstract class OrtcClient {
 	}
 
 	private void raiseOnUnsubscribed(Object... args) {
-		OrtcClient sender = args != null && args.length == 2 ? (OrtcClient) args[0]
-				: null;
+		OrtcClient sender = (OrtcClient) (args != null && args.length == 2 ? args[0]
+				: null);
 		String channel = args != null && args.length == 2 ? (String) args[1]
 				: null;
 
@@ -1294,38 +1136,51 @@ public abstract class OrtcClient {
 	}
 
 	private void raiseOnReceived(Object... args) {
-		String channel = args != null && args.length == 5 ? (String) args[0]
+		String channel = args != null && args.length >= 5 ? (String) args[0]
 				: null;
-		String message = args != null && args.length == 5 ? (String) args[1]
+		String message = args != null && args.length >= 5 ? (String) args[1]
 				: null;
-		String messageId = args != null && args.length == 5 ? (String) args[2]
+		String messageId = args != null && args.length >= 5 ? (String) args[2]
 				: null;
 
 		// CAUSE: Possible null pointer dereference
-		Integer messagePart = args != null && args.length == 5 ? (Integer) args[3]
+		Integer messagePart = args != null && args.length >= 5 ? (Integer) args[3]
 				: null;
 		// CAUSE: Possible null pointer dereference
-		Integer messageTotalParts = args != null && args.length == 5 ? (Integer) args[4]
+		Integer messageTotalParts = args != null && args.length >= 5 ? (Integer) args[4]
 				: null;
 
-		if (messagePart != null && messagePart == -1
+		Map<String, Object> payload = args != null && args.length == 6 ? (Map<String, Object>) args[5]
+				: null;
+		
+		if ((messagePart != null && messagePart == -1
 				|| (messagePart != null && messageTotalParts != null)
-				&& (messagePart == 1 && messageTotalParts == 1)) {
+				&& (messagePart == 1 && messageTotalParts == 1)) || messageId == null) {
 			ChannelSubscription subscription = subscribedChannels.get(channel);
 			if (subscription != null) {
-				OnMessage onMessageEventHandler = subscription.getOnMessage();
-				if (onMessageEventHandler != null) {
-					message = CharEscaper.removeEsc(message);
-				  onMessageEventHandler.run(this, channel, message);
-					try {						
-						if (messageId != null
-								&& multiPartMessagesBuffer
-										.containsKey(messageId)) {
-							multiPartMessagesBuffer.remove(messageId);
+				boolean isAlreadyDispatched = false;
+				if (messageId != null) {
+					isAlreadyDispatched = dispatchedMessages
+							.checkIfDispatched(messageId);
+				}
+				if (!isAlreadyDispatched) {
+					if (messageId != null)
+						dispatchedMessages.addMessageId(messageId);
+					//OnMessage onMessageEventHandler = subscription.getOnMessage();
+					//if (onMessageEventHandler != null) {
+						message = CharEscaper.removeEsc(message);
+						//onMessageEventHandler.run(this, channel, message);
+						subscription.runHandler(this, channel, message);
+						try {
+							if (messageId != null
+									&& multiPartMessagesBuffer
+											.containsKey(messageId)) {
+								multiPartMessagesBuffer.remove(messageId);
+							}
+						} catch (Exception e) {
+							raiseOrtcEvent(EventEnum.OnException, this, e);
 						}
-					} catch (Exception e) {
-						raiseOrtcEvent(EventEnum.OnException, this, e);
-					}
+					//}
 				}
 			}
 		} else {
@@ -1356,6 +1211,102 @@ public abstract class OrtcClient {
 		}
 
 	}
+
+	/**
+	 * Get if heartbeat active.
+	 * 
+	 * @return if heartbeat is active.
+	 */
+	public boolean getHeartbeatActive() {
+		return heartbeatActive;
+	}
+
+	/**
+	 * Set heart beat active. Heart beat provides better accuracy for presence data.
+	 * 
+	 * @param active
+	 * 		true to activate heartbeat and false to deactivate.
+	 */
+	public void setHeartbeatActive(boolean active) {
+		this.heartbeatActive = active;
+	}
+
+	/**
+	 * Get how many times can the client fail the heartbeat.
+	 * 
+	 * @return amount of fails the heartbeat can have before disconnecting.
+	 */
+	public int getHeartbeatFails() {
+		return heartbeatFails;
+	}
+
+	/**
+	 * Set heartbeat fails. Defines how many times can the client fail the heartbeat.
+	 * 
+	 * @param newHeartbeatFails
+	 */
+	public void setHeartbeatFails(int newHeartbeatFails) {
+		if (newHeartbeatFails > 0) {
+			if (newHeartbeatFails > heartbeatMaxFails
+					|| newHeartbeatFails < heartbeatMinFails) {
+				raiseOrtcEvent(EventEnum.OnException, this, new Exception(
+						"Heartbeat fails is out of limits - Min: "
+								+ heartbeatMinFails + " | Max: "
+								+ heartbeatMaxFails));
+			} else {
+				heartbeatFails = newHeartbeatFails;
+			}
+		} else {
+			raiseOrtcEvent(EventEnum.OnException, this, new Exception(
+					"Invalid heartbeat fails " + newHeartbeatFails));
+		}
+	}
+
+	/**
+	 * Get heartbeat interval.
+	 * 
+	 * @return interval between heartbeats.
+	 */
+	public int getHeartbeatTime() {
+		return heartbeatTime;
+	}
+
+	/**
+	 * Set heartbeat fails. Defines how many times can the client fail the heartbeat.
+	 * 
+	 * @param newHeartbeatTime
+	 */
+	public void setHeartbeatTime(int newHeartbeatTime) {
+		if (newHeartbeatTime > 0) {
+			if (newHeartbeatTime > heartbeatMaxTime
+					|| newHeartbeatTime < heartbeatMinTime) {
+				raiseOrtcEvent(EventEnum.OnException, this, new Exception(
+						"Heartbeat time is out of limits - Min: "
+								+ heartbeatMinTime + " | Max: "
+								+ heartbeatMaxTime));
+			} else {
+				heartbeatTime = newHeartbeatTime;
+			}
+		} else {
+			raiseOrtcEvent(EventEnum.OnException, this, new Exception(
+					"Invalid heartbeat time " + newHeartbeatTime));
+		}
+	}
+
+	public void startHeartBeatInterval() {
+		if (heartbeatSender == null && heartbeatActive) {
+			heartbeatSender = new HeartbeatSender(this);
+		}
+	}
+
+	public void stopHeartBeatInterval() {
+		if (heartbeatSender != null) {
+			heartbeatSender.stop();
+			heartbeatSender = null;
+		}
+	}
+
+	protected abstract void sendHeartbeat();
 
 	// ========== Raise of events ==========
 }
