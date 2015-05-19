@@ -4,149 +4,109 @@
 package ibt.ortc.api;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
+//import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
+//import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.util.LinkedList;
 import java.util.Map;
+
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
+//import javax.net.ssl.SSLSocket;
+//import javax.net.ssl.SSLSocketFactory;
+//import org.apache.http.HttpException;
 
 /**
  * @author ORTC team members (ortc@ibt.pt)
  * 
  */
 public class Authentication {
-	// CAUSE: Prefer throwing/catching meaningful exceptions instead of
-	// Exception
-	protected static boolean saveAuthentication(URL url,
-			String authenticationToken, boolean authenticationTokenIsPrivate,
-			String applicationKey, int timeToLive, String privateKey,
-			Map<String, LinkedList<ChannelPermissions>> permissions, Proxy proxy)
-			throws IOException {
-		String postBody = String.format(
-				"AT=%s&AK=%s&PK=%s&TTL=%s&TP=%s&PVT=%s", authenticationToken,
-				applicationKey, privateKey, timeToLive, permissions.size(),
-				(authenticationTokenIsPrivate ? "1" : "0"));
+  // CAUSE: Prefer throwing/catching meaningful exceptions instead of Exception
+  protected static boolean saveAuthentication(URL url, String authenticationToken, boolean authenticationTokenIsPrivate,
+      String applicationKey, int timeToLive, String privateKey, Map<String, LinkedList<ChannelPermissions>> permissions, Proxy proxy)
+      throws IOException {
+    String postBody = String.format("AT=%s&AK=%s&PK=%s&TTL=%s&TP=%s&PVT=%s", authenticationToken, applicationKey, privateKey,
+        timeToLive, permissions.size(), (authenticationTokenIsPrivate ? "1" : "0"));
 
-		// CAUSE: Inefficient use of keySet iterator instead of entrySet
-		// iterator
-		for (Map.Entry<String, LinkedList<ChannelPermissions>> channelNamePerms : permissions
-				.entrySet()) {
-			LinkedList<ChannelPermissions> channelPermissions = channelNamePerms
-					.getValue();
-			// CAUSE: Method concatenates strings using + in a loop
-			// TODO: specify a correct capacity
-			StringBuilder channelPermissionText = new StringBuilder(16);
-			for (ChannelPermissions channelPermission : channelPermissions) {
-				channelPermissionText.append(channelPermission.getPermission());
-			}
+    // CAUSE: Inefficient use of keySet iterator instead of entrySet iterator
+    for (Map.Entry<String, LinkedList<ChannelPermissions>> channelNamePerms : permissions.entrySet()) {
+      LinkedList<ChannelPermissions> channelPermissions = channelNamePerms.getValue();
+      // CAUSE: Method concatenates strings using + in a loop
+      // TODO: specify a correct capacity
+      StringBuilder channelPermissionText = new StringBuilder(16);
+      for (ChannelPermissions channelPermission : channelPermissions) {
+        channelPermissionText.append(channelPermission.getPermission());
+      }
 
-			String channelPermission = String.format("&%s=%s",
-					channelNamePerms.getKey(), channelPermissionText);
-			postBody = String.format("%s%s", postBody, channelPermission);
-		}
+      String channelPermission = String.format("&%s=%s", channelNamePerms.getKey(), channelPermissionText);
+      postBody = String.format("%s%s", postBody, channelPermission);
+    }
 
-		// CAUSE: Unused assignment
-		boolean isAuthenticated;
-		isAuthenticated = "https".equals(url.getProtocol()) ? secureSaveAuthentication(
-				url, postBody,proxy) : unsecureSaveAuthentication(url, postBody);
+    // CAUSE: Unused assignment
+    boolean isAuthenticated;
+    isAuthenticated = "https".equals(url.getProtocol()) ? secureSaveAuthentication(url, postBody, proxy) : unsecureSaveAuthentication(url, postBody, proxy);
 
-		return isAuthenticated;
-	}
+    return isAuthenticated;
+  }
 
-	protected static void saveAuthenticationAsync(URL url,
-			String authenticationToken, boolean authenticationTokenIsPrivate,
-			String applicationKey, int timeToLive, String privateKey,
-			Map<String, LinkedList<ChannelPermissions>> permissions, Proxy proxy,
-			OnRestWebserviceResponse onCompleted) throws IOException {
-		String postBody = String.format(
-				"AT=%s&AK=%s&PK=%s&TTL=%s&TP=%s&PVT=%s", authenticationToken,
-				applicationKey, privateKey, timeToLive, permissions.size(),
-				(authenticationTokenIsPrivate ? "1" : "0"));
+  // CAUSE: Prefer throwing/catching meaningful exceptions instead of Exception
+  protected static boolean unsecureSaveAuthentication(URL url, String postBody, Proxy proxy) throws IOException {
+    HttpURLConnection connection = null;
+    boolean result = false;
 
-		// CAUSE: Inefficient use of keySet iterator instead of entrySet
-		// iterator
-		for (Map.Entry<String, LinkedList<ChannelPermissions>> channelNamePerms : permissions
-				.entrySet()) {
-			LinkedList<ChannelPermissions> channelPermissions = channelNamePerms
-					.getValue();
-			// CAUSE: Method concatenates strings using + in a loop
-			// TODO: specify a correct capacity
-			StringBuilder channelPermissionText = new StringBuilder(16);
-			for (ChannelPermissions channelPermission : channelPermissions) {
-				channelPermissionText.append(channelPermission.getPermission());
-			}
+    try {
+    	if(proxy.isDefined()){
+    		java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
+    		connection = (HttpURLConnection) url.openConnection(jnp);
+    	} else {
+    		connection = (HttpURLConnection) url.openConnection();
+    	}      
+      connection.setRequestMethod("POST");
+      connection.setDoOutput(true);
 
-			String channelPermission = String.format("&%s=%s",
-					channelNamePerms.getKey(), channelPermissionText);
-			postBody = String.format("%s%s", postBody, channelPermission);
-		}
+      OutputStreamWriter wr = null;
+      try {
+        // CAUSE: Reliance on default encoding
+        wr = new OutputStreamWriter(connection.getOutputStream(), "UTF-8");
 
-		// CAUSE: Unused assignment
-		RestWebservice.postAsync(url, postBody, proxy, onCompleted);
-	}
+        wr.write(postBody);
 
-	// CAUSE: Prefer throwing/catching meaningful exceptions instead of
-	// Exception
-	protected static boolean unsecureSaveAuthentication(URL url, String postBody)
-			throws IOException {
-		HttpURLConnection connection = null;
-		boolean result = false;
+        wr.flush();
+        // CAUSE: Method may fail to close stream on exception
+      } finally {
+        if (wr != null) {
+          wr.close();
+        }
+      }
 
-		try {
-			connection = (HttpURLConnection) url.openConnection();
-			connection.setRequestMethod("POST");
-			connection.setDoOutput(true);
+      BufferedReader rd = null;
+      try {
+        // CAUSE: Reliance on default encoding
+        rd = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
+        // CAUSE: Method may fail to close stream on exception
+      } finally {
+        if (rd != null) {
+          rd.close();
+        }
+      }
 
-			OutputStreamWriter wr = null;
-			try {
-				// CAUSE: Reliance on default encoding
-				wr = new OutputStreamWriter(connection.getOutputStream(),
-						"UTF-8");
+      result = connection.getResponseCode() == 201;
+      // CAUSE: Method may fail to close connection on exception
+    } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
+    }
 
-				wr.write(postBody);
+    return result;
+  }
 
-				wr.flush();
-				// CAUSE: Method may fail to close stream on exception
-			} finally {
-				if (wr != null) {
-					wr.close();
-				}
-			}
-
-			BufferedReader rd = null;
-			try {
-				// CAUSE: Reliance on default encoding
-				rd = new BufferedReader(new InputStreamReader(
-						connection.getInputStream(), "UTF-8"));
-				// CAUSE: Method may fail to close stream on exception
-			} finally {
-				if (rd != null) {
-					rd.close();
-				}
-			}
-
-			result = connection.getResponseCode() == 201;
-			// CAUSE: Method may fail to close connection on exception
-		} finally {
-			if (connection != null) {
-				connection.disconnect();
-			}
-		}
-
-		return result;
-	}
-
-	// CAUSE: Prefer throwing/catching meaningful exceptions instead of
-	// Exception
-	private static boolean secureSaveAuthentication(URL url, String postBody, Proxy proxy) throws IOException {
+  // CAUSE: Prefer throwing/catching meaningful exceptions instead of Exception
+  private static boolean secureSaveAuthentication(URL url, String postBody, Proxy proxy) throws IOException {
 	  /*
     SSLSocketFactory sslsocketfactory = SecureWebConnections.getFullTrustSSLFactory();
 
@@ -164,9 +124,9 @@ public class Authentication {
     // CAUSE: Reliance on default encoding
     BufferedReader stdIn = new BufferedReader(new InputStreamReader(sslsocket.getInputStream(), "UTF-8"));
 
-    String request = String.format("POST %s HTTP/1.1\r\n",url.getPath()) +
-        "User-Agent: OrtcJavaApi\r\n" +
-        "Connection: keep-alive\r\n" +
+    String request = String.format("POST %s HTTP/1.1\r\n",url.getPath()) + 
+        "User-Agent: OrtcJavaApi\r\n" + 
+        "Connection: keep-alive\r\n" + 
         "Content-Length: " + postBody.length() + "\r\n" +
         "Content-Type: application/x-www-form-urlencoded\r\n" +
         "\r\n" +
@@ -187,51 +147,50 @@ public class Authentication {
     outputstream.close();
     stdIn.close();
     sslsocket.close();*/
-		boolean isAuthenticated = false;
-		HttpsURLConnection connection = null;
+	boolean isAuthenticated = false;
+    HttpsURLConnection connection = null;    
 
-		try {
-			//connection = (HttpsURLConnection) url.openConnection();
-			if(proxy.isDefined()){
-				java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
-				connection = (HttpsURLConnection) url.openConnection(jnp);
-			} else {
-				connection = (HttpsURLConnection) url.openConnection();
-			}
-			connection.setRequestMethod("POST");
-			connection.setDoOutput(true);
-
-			OutputStreamWriter wr = null;
-			try {
-				// CAUSE: Reliance on default encoding
-				wr = new OutputStreamWriter(connection.getOutputStream(), "UTF-8");
-
-				wr.write(postBody);
-
-				wr.flush();
-				// CAUSE: Method may fail to close stream on exception
-			} finally {
-				if (wr != null) {
-					wr.close();
-				}
-			}
-
-
-			if (connection.getResponseCode() == 201)
-				isAuthenticated = true;
-
-		} finally {
-			if (connection != null) {
-				connection.disconnect();
-			}
+    try {
+      //connection = (HttpsURLConnection) url.openConnection();
+      if(proxy.isDefined()){
+			java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
+			connection = (HttpsURLConnection) url.openConnection(jnp);
+		} else {
+			connection = (HttpsURLConnection) url.openConnection();
 		}
+      connection.setRequestMethod("POST");
+      connection.setDoOutput(true);
 
+      OutputStreamWriter wr = null;
+      try {
+        // CAUSE: Reliance on default encoding
+        wr = new OutputStreamWriter(connection.getOutputStream(), "UTF-8");
 
-		return isAuthenticated;
-	}
+        wr.write(postBody);
 
-	// CAUSE: Utility class contains only static elements and is still
-	// instantiable
-	private Authentication() {
-	}
+        wr.flush();
+        // CAUSE: Method may fail to close stream on exception
+      } finally {
+        if (wr != null) {
+          wr.close();
+        }
+      }
+
+      
+      if (connection.getResponseCode() == 201) 
+    	  isAuthenticated = true;
+
+    } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
+    }
+
+    
+    return isAuthenticated;
+  }
+
+  // CAUSE: Utility class contains only static elements and is still instantiable
+  private Authentication() {
+  }
 }
