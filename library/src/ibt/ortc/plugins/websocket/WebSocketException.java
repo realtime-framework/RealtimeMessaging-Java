@@ -17,10 +17,10 @@
 package ibt.ortc.plugins.websocket;
 
 
-
-public class WebSocketException extends RuntimeException
+public class WebSocketException
+		extends Exception
 {
-	private static final long serialVersionUID = 2L;
+	private static final long serialVersionUID = 1L;
 
 
 	public WebSocketException(String message)

@@ -72,13 +72,6 @@ public class Strings {
 		return (matcher != null && matcher.matches()) ? true : false;
 	}
 	
-	public static boolean ortcIsValidChannelForNotifications(String value) {
-		Pattern regexPattern = Pattern.compile("^[\\w-:]*$");
-		Matcher matcher = regexPattern.matcher(value);
-		
-		return (matcher != null && matcher.matches()) ? true : false;
-	}
-	
 	public static boolean ortcIsValidUrl(String value) {
 		Pattern regexPattern = Pattern.compile("^\\s*(http|https):\\/\\/(\\w+:{0,1}\\w*@)?(\\S+)(:[0-9]+)?(\\/|\\/([\\w#!:.?+=&%@!\\-\\/]))?\\s*$");
 		Matcher matcher = regexPattern.matcher(value);
