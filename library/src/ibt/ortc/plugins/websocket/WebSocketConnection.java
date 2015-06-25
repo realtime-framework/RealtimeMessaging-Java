@@ -324,8 +324,7 @@ public class WebSocketConnection implements WebSocket {
             replyStr = new String(reply, 0, replyLen);
         }
 
-        /* We asked for HTTP/1.0, so we should get that back */
-        if (!replyStr.startsWith("HTTP/1.0 200")) {
+        if (!replyStr.contains("200")) {
             throw new Exception("Unable to tunnel through. Proxy returns \"" + replyStr + "\"");
         }
 
