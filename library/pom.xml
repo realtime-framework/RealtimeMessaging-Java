@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+ 
+    <groupId>co.realtime</groupId>
+    <artifactId>messaging</artifactId>
+    <version>2.1.30</version>
+    <packaging>jar</packaging>
+    <name>Messaging</name>
+    <description>Realtime Cloud Messaging (ORTC) SDK for Java</description>
+    <modelVersion>4.0.0</modelVersion>
+    <url> https://github.com/realtime-framework/RealtimeMessaging-Java</url>
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>http://www.opensource.org/licenses/mit-license.php</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <id>realtimeframework</id>
+            <name>RealTime Framework</name>
+            </developer>
+        </developers>
+    <scm>
+        <connection>scm:git@github.com:realtime-framework/RealtimeMessaging-Java.git</connection>
+        <developerConnection>scm:git@github.com:realtime-framework/RealtimeMessaging-Java.git</developerConnection>
+        <url>https://github.com/realtime-framework/RealtimeMessaging-Java</url>
+    </scm>
+         
+    <build>
+        <plugins> 
+        <plugin>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+        <execution>
+          <id>attach-sources</id>
+          <goals><goal>jar</goal></goals> 
+        </execution>
+      </executions>
+    </plugin>
+    <plugin> 
+      <artifactId>maven-javadoc-plugin</artifactId> 
+      <executions> 
+        <execution> 
+          <id>attach-javadocs</id>
+          <goals><goal>jar</goal></goals> 
+        </execution> 
+      </executions> 
+    </plugin>
+    <plugin> 
+      <!-- explicitly define maven-deploy-plugin after other to force exec order -->
+      <artifactId>maven-deploy-plugin</artifactId> 
+      <executions> 
+        <execution> 
+          <id>deploy</id>
+          <phase>deploy</phase>
+          <goals><goal>deploy</goal></goals> 
+        </execution> 
+      </executions> 
+    </plugin>
+    <plugin>
+         <groupId>org.apache.maven.plugins</groupId>
+         <artifactId>maven-gpg-plugin</artifactId>
+         <version>1.5</version>
+         <executions>
+               <execution>
+                    <id>sign-artifacts</id>
+                    <phase>verify</phase>
+                    <goals>
+                    <goal>sign</goal>
+                    </goals>
+                </execution>
+             </executions>
+     </plugin>
+  </plugins> 
+</build>
+    <dependencies>
+        <dependency>
+            <groupId>com.googlecode.json-simple</groupId>
+            <artifactId>json-simple</artifactId>
+            <version>1.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.2.5</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpcore</artifactId>
+            <version>4.2.4</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+            <version>1.1.3</version>
+        </dependency>
+    </dependencies>
+     <distributionManagement>
+        <repository>
+        <id>release</id>
+        <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
+        </repository>
+        <snapshotRepository>
+            <id>snapshot</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
+</project>
