@@ -1,15 +1,10 @@
 package ibt.ortc.api;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
+import javax.net.ssl.HttpsURLConnection;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URL;
-import javax.net.ssl.HttpsURLConnection;
-import org.apache.http.HttpException;
 
 public class RestWebservice {
   
@@ -32,16 +27,12 @@ public class RestWebservice {
             callback.run(null, result);
           } catch (IOException error) {
             callback.run(error, null);
-          } catch (HttpException error) {
-            callback.run(error, null);
           }
         } else if (method.equals("POST")) {
           try {
             String result = "https".equals(url.getProtocol()) ? securePostRequest(url, content, proxy) : unsecurePostRequest(url, content, proxy);
             callback.run(null, result);
           } catch (IOException error) {
-            callback.run(error, null);
-          } catch (HttpException error) {
             callback.run(error, null);
           }
         } else {
@@ -53,7 +44,7 @@ public class RestWebservice {
     new Thread(task).start();
   }
 
-  private static String unsecureGetRequest(URL url, Proxy proxy) throws IOException, HttpException {
+  private static String unsecureGetRequest(URL url, Proxy proxy) throws IOException {
     HttpURLConnection connection = null;
     String result = "";
 
@@ -70,7 +61,7 @@ public class RestWebservice {
         responseBody = connection.getErrorStream();
 
         result = readResponseBody(responseBody);
-        throw new HttpException(result);
+        throw new IOException(result);
       } else {
         responseBody = connection.getInputStream();
 
@@ -87,7 +78,7 @@ public class RestWebservice {
 
   // CAUSE: Prefer throwing/catching meaningful exceptions instead of
   // Exception
-  private static String secureGetRequest(URL url, Proxy proxy) throws IOException, HttpException {
+  private static String secureGetRequest(URL url, Proxy proxy) throws IOException {
     HttpsURLConnection connection = null;
     StringBuilder result = new StringBuilder(16);
 
@@ -113,7 +104,7 @@ public class RestWebservice {
             line = rd.readLine();
           }
           rd.close();
-          throw new HttpException(result.toString());
+          throw new IOException(result.toString());
         } else {
           rd = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
           String line = rd.readLine();
@@ -139,7 +130,7 @@ public class RestWebservice {
     return result.toString();
   }
 
-  private static String unsecurePostRequest(URL url, String postBody, Proxy proxy) throws IOException, HttpException {
+  private static String unsecurePostRequest(URL url, String postBody, Proxy proxy) throws IOException {
     HttpURLConnection connection = null;
     StringBuilder result = new StringBuilder(16);
 
@@ -181,7 +172,7 @@ public class RestWebservice {
             line = rd.readLine();
           }
 
-          throw new HttpException(result.toString());
+          throw new IOException(result.toString());
         } else {
           // CAUSE: Reliance on default encoding
           rd = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
@@ -208,7 +199,7 @@ public class RestWebservice {
     return result.toString();
   }
 
-  private static String securePostRequest(URL url, String postBody, Proxy proxy) throws IOException, HttpException {
+  private static String securePostRequest(URL url, String postBody, Proxy proxy) throws IOException {
     HttpsURLConnection connection = null;
     // TODO: specify a correct capacity
     StringBuilder result = new StringBuilder(16);
@@ -251,7 +242,7 @@ public class RestWebservice {
             line = rd.readLine();
           }
 
-          throw new HttpException(result.toString());
+          throw new IOException(result.toString());
         } else {
           // CAUSE: Reliance on default encoding
           rd = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
