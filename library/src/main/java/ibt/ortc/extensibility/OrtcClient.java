@@ -275,7 +275,7 @@ public abstract class OrtcClient {
 	protected static final int MAX_CHANNEL_SIZE = 100;
 	public static final int MAX_CONNECTION_METADATA_SIZE = 256;
 	protected static final int CONNECTION_TIMEOUT_DEFAULT_VALUE = 5000;
-	
+
 	// ========== Constants ==========
 
 	// ========== Enumerators ==========
@@ -414,7 +414,7 @@ public abstract class OrtcClient {
 		this.isDisconnecting = false;
 		this.isReconnecting = false;
 		this.isConnecting = false;
-		this.proxy = new Proxy();
+		this.proxy = null;
 
 		this.subscribedChannels = new Hashtable<String, ChannelSubscription>(11);
 		this.channelsPermissions = new Hashtable<String, String>(11);
@@ -1140,10 +1140,26 @@ public abstract class OrtcClient {
 	 * @param proxyHost Proxy host
 	 * @param proxyPort Proxy port
 	 */
-	public void useProxy(String proxyHost, int proxyPort){
-		this.proxy = new Proxy(proxyHost, proxyPort);	
+	public void setProxy(String proxyHost, int proxyPort){
+		setProxy(proxyHost, proxyPort, null, null);
 	}
-	
+
+	/**
+	 * sets proxy, optionally using basic authentication
+	 *
+	 * @param host	proxy host
+	 * @param port	proxy port
+	 * @param user	proxy user or null when no authentication is needed
+	 * @param pwd	proxy password or null when no authentication is needed
+	 */
+	public void setProxy(String host, int port, String user, String pwd) {
+		this.proxy = new Proxy(host, port, user, pwd);
+	}
+
+	public void setProxy(Proxy proxy) {
+		this.proxy = proxy;
+	}
+
 	// ========== Getters and Setters ==========
 
 	// ========== Raise of events ==========
