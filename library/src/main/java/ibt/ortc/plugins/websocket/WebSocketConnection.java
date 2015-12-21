@@ -87,6 +87,11 @@ public class WebSocketConnection implements WebSocket {
                 pos += 1;
 
                 if (!header) {
+                    if (b == -1) {
+                        //in my case, the proxy closes the connection after the handshake when using unsecure websocket
+                        //using secure websocket works fine / is allowed
+                        throw new IOException("Connection closed by remote (if using proxy, it probably doesn't allow proxying unsecure websockets, try secure connection");
+                    }
                     // CAUSE: Not used
                     if (pos == 16) {
                         handshakeComplete = true;
@@ -207,8 +212,8 @@ public class WebSocketConnection implements WebSocket {
             }
             try {
 
-            	if(proxy.isDefined()){
-            		lSocket = createProxyTunnel(proxy.getHost(), proxy.getPort(), host, port);
+            	if (proxy != null) {
+            		lSocket = createProxyTunnel(proxy, host, port);
             	} else {
             		lSocket = new Socket(host, port);
             	}
@@ -234,12 +239,14 @@ public class WebSocketConnection implements WebSocket {
             try {        	
                 SSLSocketFactory factory = SecureWebConnections.getFullTrustSSLFactory();
 
-                if(proxy.isDefined()){
-                	Socket tunnel = createProxyTunnel(proxy.getHost(), proxy.getPort(), host, port);
+                if (proxy != null) {
+                	Socket tunnel = createProxyTunnel(proxy, host, port);
                 	lSocket = factory.createSocket(tunnel, host, port, true);                	
                 } else {
                 	lSocket = factory.createSocket(host, port);
                 }
+                lSocket.setKeepAlive(true);
+                lSocket.setSoTimeout(0);
 
                 String[] protocols = { "TLSv1" };
                 ((SSLSocket) lSocket).setEnabledProtocols(protocols);
@@ -261,10 +268,13 @@ public class WebSocketConnection implements WebSocket {
         return lSocket;
     }
 
-    private Socket createProxyTunnel(String proxyHost, int proxyPort, String targetHost, int targetPort) throws Exception{
-    	Socket tunnel = new Socket(proxyHost, proxyPort);
+    private Socket createProxyTunnel(Proxy proxy, String targetHost, int targetPort) throws Exception{
+    	Socket tunnel = new Socket(proxy.getHost(), proxy.getPort());
     	OutputStream out = tunnel.getOutputStream();
     	String msg = "CONNECT " + targetHost + ":" + targetPort + " HTTP/1.1\n"
+                + (proxy.getProxyAuth() != null ? "Proxy-Authorization: Basic " + proxy.getProxyAuth() + "\n" : "")
+                + "Connection: Keep-alive\n"
+                + "Proxy-Connection: Keep-alive\n"
                 + "User-Agent: "
                 + sun.net.www.protocol.http.HttpURLConnection.userAgent
                 + "\r\n\r\n";
