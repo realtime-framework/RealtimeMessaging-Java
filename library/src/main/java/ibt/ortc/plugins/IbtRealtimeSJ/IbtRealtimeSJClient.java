@@ -41,26 +41,17 @@ public final class IbtRealtimeSJClient extends OrtcClient {
 		String connectionUrl = String.format("%s://%s:%s/broadcast/%s/%s/websocket", this.protocol.getProtocol(), this.uri.getHost(), port,
 				randomGenerator.nextInt(1000), Strings.randomString(8));
 
-		boolean ex = false;
 		try {
 			URI connectionUri = new URI(connectionUrl);
 			socket = new WebSocketConnection(connectionUri, this.proxy);
 			addSocketEventsListener();
 
 			socket.connect();
-		} catch (WebSocketException e) {
-			ex = true;
-		} catch (URISyntaxException e) {
-			ex = true;
-		} catch (WebSocketProxyException e) {
+		} catch (Exception e) {
 			raiseOrtcEvent(EventEnum.OnException, (OrtcClient) this, new OrtcNotConnectedException(e.getMessage()));
 		} finally {
-			if (ex) {
-				raiseOrtcEvent(EventEnum.OnException, (OrtcClient) this, new OrtcNotConnectedException(
-						"Could not connect. Check if the server is running correctly."));
-				if (isReconnecting) {
-					raiseOrtcEvent(EventEnum.OnReconnecting, (OrtcClient) this);
-				}
+			if (isReconnecting) {
+				raiseOrtcEvent(EventEnum.OnReconnecting, (OrtcClient) this);
 			}
 		}
 	}
