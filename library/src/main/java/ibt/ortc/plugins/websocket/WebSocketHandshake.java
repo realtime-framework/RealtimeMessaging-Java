@@ -47,7 +47,7 @@ public class WebSocketHandshake {
         origin = String.format("http://%s", host);
 
         // CAUSE: Prefer String.format to +
-        String handshake = String.format("GET %s HTTP/1.1%nHost: %s%nConnection: Upgrade%nSec-WebSocket-Key2: %s%n", path, host, key2);
+        String handshake = String.format("GET %s HTTP/1.1%nHost: %s%nConnection: Upgrade%nConnection: keep-alive%nSec-WebSocket-Key2: %s%n", path, host, key2);
         //String handshake = String.format("CONNECT ortc-developers2-euwest1-S0001.realtime.co:443 HTTP/1.1%nHost: %s%nConnection: Upgrade%nSec-WebSocket-Key2: %s%n", host, host, key2);
         
         // CAUSE: Prefer String.format to +

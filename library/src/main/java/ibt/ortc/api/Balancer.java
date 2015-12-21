@@ -4,19 +4,13 @@
  */
 package ibt.ortc.api;
 
-import java.io.BufferedReader;
+import ibt.ortc.util.IOUtil;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLConnection;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import javax.net.ssl.HttpsURLConnection;
 
 /**
  * A static class containing all the methods to communicate with the Ortc
@@ -93,95 +87,13 @@ public class Balancer{
 
 		URL url = new URL(parsedUrl);
 
-		// CAUSE: Unused assignment
-		String clusterServer;
-
-		clusterServer = unsecureRequest(url, proxy); //"https".equals(protocolMatcher.group(1)) ? mkSecureRequest(url, proxy) : unsecureRequest(url, proxy);
-
-		return clusterServer;
-	}
-
-	private static String unsecureRequest(URL url, Proxy proxy) throws InvalidBalancerServerException, IOException  {
-		HttpURLConnection connection = null;
-		String result = "";
-
-		try {
-			if(proxy.isDefined()){
-				java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
-				connection = (HttpURLConnection) url.openConnection(jnp);
-			} else {
-				connection = (HttpURLConnection) url.openConnection();
-			}
-			connection.setReadTimeout(1000*15);
-			connection.setRequestProperty("user-agent", UserAgent);
-
-			BufferedReader rd = null;
-			try {
-				// CAUSE: Reliance on default encoding
-				rd = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
-				// TODO: specify a correct capacity
-				StringBuilder lResult = new StringBuilder(16);
-
-				String line = rd.readLine();
-				// CAUSE: Assignment expressions nested inside other expressions
-				while (line != null) {
-					// CAUSE: Method concatenates strings using + in a loop
-					lResult.append(line);
-					line = rd.readLine();
-				}
-
-				Matcher matcher = balancerServerPattern.matcher(lResult);
-				if (!matcher.matches()) {
-					throw new InvalidBalancerServerException(lResult.toString());
-				}
-				result = matcher.group(1);
-				// CAUSE: Method may fail to close stream on exception
-			} catch (Exception ex){
-				throw new InvalidBalancerServerException(ex.getMessage());
-			} finally {
-				if (rd != null) {
-					rd.close();
-				}
-			}
-			// CAUSE: Method may fail to close connection on exception
-		} finally {
-			if (connection != null) {
-				connection.disconnect();
-			}
+		String balancer = IOUtil.doGetRequest(url, proxy);
+		Matcher matcher = balancerServerPattern.matcher(balancer);
+		if (!matcher.matches()) {
+			throw new InvalidBalancerServerException(balancer);
 		}
-
-		return result;
+		return matcher.group(1);
 	}
-
-	private static String mkSecureRequest(URL url, Proxy proxy) throws IOException, InvalidBalancerServerException{
-		HttpsURLConnection.setDefaultSSLSocketFactory(SecureWebConnections.getFullTrustSSLFactory());
-		String result = null;
-		URLConnection conn;
-		try{
-			if(proxy.isDefined()){
-				java.net.Proxy jnp = new java.net.Proxy(java.net.Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(), proxy.getPort()));
-				conn = (HttpsURLConnection) url.openConnection(jnp);
-			} else {
-				conn = (HttpsURLConnection) url.openConnection();
-			}
-
-			BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-			StringBuilder lResult = new StringBuilder(16);
-			String line;
-			while ((line = reader.readLine()) != null) {
-				lResult.append(line);
-			}
-			Matcher matcher = balancerServerPattern.matcher(lResult);
-			if (!matcher.matches()) {
-				throw new InvalidBalancerServerException(lResult.toString());
-			}
-			result = matcher.group(1);
-		} catch (Exception ex){
-			throw new InvalidBalancerServerException(ex.getMessage());
-		}
-		return result;
-	}
-
 
 	// CAUSE: Utility class contains only static elements and is still instantiable
 	private Balancer() {
