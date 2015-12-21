@@ -21,6 +21,7 @@ public class Main {
     private static boolean isBalancer;
     private static String applicationKey;
     private static String authenticationToken;
+    private static Proxy proxy;
 
     /**
      * @param args
@@ -175,7 +176,7 @@ public class Main {
     }
 
     private static void getPresence(String channel){
-        Ortc.presence(serverUrl, isBalancer, applicationKey, authenticationToken, channel, new OnPresence() {
+        Ortc.presence(serverUrl, isBalancer, applicationKey, authenticationToken, channel, proxy, new OnPresence() {
 
             @Override
             public void run(Exception error, Presence presence) {
@@ -196,7 +197,7 @@ public class Main {
     }
 
     private static void enablePresence(String channel,Boolean metadata){
-        Ortc.enablePresence(serverUrl, isBalancer, applicationKey, defaultPrivateKey, channel, metadata, new OnEnablePresence() {
+        Ortc.enablePresence(serverUrl, isBalancer, applicationKey, defaultPrivateKey, channel, metadata, proxy, new OnEnablePresence() {
 
             @Override
             public void run(Exception error, String result) {
@@ -211,7 +212,7 @@ public class Main {
     }
 
     private static void disablePresence(String channel){
-        Ortc.disablePresence(serverUrl, isBalancer, applicationKey, defaultPrivateKey, channel,new OnDisablePresence() {
+        Ortc.disablePresence(serverUrl, isBalancer, applicationKey, defaultPrivateKey, channel, proxy, new OnDisablePresence() {
 
             @Override
             public void run(Exception error, String result) {
@@ -257,7 +258,7 @@ public class Main {
             permissions.put("yellow:*", yellowPermissions);
             permissions.put("test:*", testPermissions);
 
-            if (Ortc.saveAuthentication(serverUrl, isBalancer, authenticationToken, false, applicationKey, 14000, defaultPrivateKey, permissions)) {
+            if (Ortc.saveAuthentication(serverUrl, isBalancer, authenticationToken, false, applicationKey, 14000, defaultPrivateKey, permissions, proxy)) {
                 System.out.println("Authentication successful");
             }
             else {
@@ -271,6 +272,11 @@ public class Main {
 
         final OrtcClient client = factory.createClient();
 
+        if (System.getProperty("http.proxyHost") != null) {
+            System.out.println("Main.connectOrtcClient: using proxy");
+            proxy = new Proxy(System.getProperty("http.proxyHost"), Integer.parseInt(System.getProperty("http.proxyPort")), System.getProperty("http.proxyUser"), System.getProperty("http.proxyPassword"));
+            client.setProxy(proxy);
+        }
         client.setHeartbeatActive(false);
 
         if (isBalancer) {
