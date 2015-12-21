@@ -4,6 +4,8 @@
  */
 package ibt.ortc.api;
 
+import ibt.ortc.util.IOUtil;
+
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;

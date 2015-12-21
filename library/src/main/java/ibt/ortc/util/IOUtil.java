@@ -1,4 +1,6 @@
-package ibt.ortc.api;
+package ibt.ortc.util;
+
+import ibt.ortc.api.Proxy;
 
 import java.io.*;
 import java.net.HttpURLConnection;
