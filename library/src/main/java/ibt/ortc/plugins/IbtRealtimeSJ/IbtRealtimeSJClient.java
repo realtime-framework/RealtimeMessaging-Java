@@ -342,7 +342,6 @@ public final class IbtRealtimeSJClient extends OrtcClient {
 	protected void sendHeartbeat() {
 		if(heartbeatActive){
 			sendMessage("b");
-			System.out.println("sle");
 		}
 	}
 }
