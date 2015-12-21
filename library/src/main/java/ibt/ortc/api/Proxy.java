@@ -1,6 +1,6 @@
 package ibt.ortc.api;
 
-import org.apache.commons.codec.binary.Base64;
+import ibt.ortc.util.Base64;
 
 /**
  * Class containing definition of proxy connection
@@ -12,19 +12,30 @@ public class Proxy {
 
 	/**
 	 * Creates an instance with proxy url and port defined
+	 *
 	 *  @param host Proxy host
 	 * @param port Proxy port
-	 * @param user
-	 * @param pwd
+	 */
+	public Proxy(String host, int port){
+		this(host, port, null, null);
+	}
+	
+	/**
+	 * Creates proxy config using given host, port and optional credentials
+	 *
+	 * @param host	proxy host
+	 * @param port	proxy port
+	 * @param user	proxy user or null if no authentication should be used
+	 * @param pwd	proxy password or null if no authentication should be used
 	 */
 	public Proxy(String host, int port, String user, String pwd){
 		this.host = host;
 		this.port = port;
 		if (user != null && pwd != null) {
-			proxyAuth = Base64.encodeBase64String((user + ":" + pwd).getBytes());
+			proxyAuth = Base64.encode((user + ":" + pwd).getBytes());
 		}
 	}
-	
+
 	/**
 	 * Obtain defined proxy host
 	 * 
@@ -42,6 +53,11 @@ public class Proxy {
 		return this.port;
 	}
 
+	/**
+	 * returns the encoded password hash according to basic authentication scheme "user:password"
+	 *
+	 * @return	encoded password hash or null if no authentication is used
+	 */
 	public String getProxyAuth() {
 		return proxyAuth;
 	}
