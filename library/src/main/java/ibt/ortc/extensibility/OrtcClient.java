@@ -1213,11 +1213,11 @@ public abstract class OrtcClient {
 
 	private void raiseOnDisconnected(Object... args) {
 		stopHeartBeatInterval();
+        this.isConnected = false;
 		OrtcClient sender = args != null && args.length == 1 ? (OrtcClient) args[0]
 				: null;
 		this.channelsPermissions = new Hashtable<String, String>(11);
 		if (isDisconnecting || isConnecting) {
-			this.isConnected = false;
 			this.isDisconnecting = false;
 			this.isConnecting = false;
 			this.subscribedChannels = new Hashtable<String, ChannelSubscription>(
@@ -1292,17 +1292,18 @@ public abstract class OrtcClient {
 			}
 		}
 
-		this.isConnected = false;
-		this.isDisconnecting = false;
-		this.isReconnecting = true;		
+		if(!isConnected) {
+            this.isDisconnecting = false;
+            this.isReconnecting = true;
 
-		if (onReconnecting != null) {
-			OrtcClient sender = args != null && args.length == 1 ? (OrtcClient)  args[0]
-					: null;
-			onReconnecting.run(sender);
-		}
+            if (onReconnecting != null) {
+                OrtcClient sender = args != null && args.length == 1 ? (OrtcClient)  args[0]
+                        : null;
+                onReconnecting.run(sender);
+            }
 
-		this.connect(this.applicationKey, this.authenticationToken);
+            this.connect(this.applicationKey, this.authenticationToken);
+        }
 	}
 
 	private void raiseOnSubscribed(Object... args) {
