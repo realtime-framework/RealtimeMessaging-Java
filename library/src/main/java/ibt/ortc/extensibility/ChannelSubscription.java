@@ -20,8 +20,31 @@ public class ChannelSubscription {
 	private boolean isSubscribed;
 	private boolean subscribeOnReconnected;
 	private OnMessage onMessage;
-	
-	/**
+    private OnMessageWithFilter onMessageWithFilter;
+	private String filter;
+	private boolean isWithFilter;
+
+    public String getFilter() {
+        return filter;
+    }
+
+    public void setFilter(String filter) {
+        this.filter = filter;
+    }
+
+    public boolean isWithFilter() {
+        return isWithFilter;
+    }
+
+    public void setWithFilter(boolean withFilter) {
+        isWithFilter = withFilter;
+    }
+
+    public OnMessageWithFilter getOnMessageWithFilter() {
+        return onMessageWithFilter;
+    }
+
+    /**
 	 * Creates an instance of a channel subscription
 	 * @param subscribeOnReconnected Indicates if the channel should be subscribe if a reconnect happens
 	 * @param onMessage Event handler that is fired when a message is received in the channel
@@ -29,6 +52,18 @@ public class ChannelSubscription {
 	public ChannelSubscription(boolean subscribeOnReconnected,OnMessage onMessage){
 		this.subscribeOnReconnected = subscribeOnReconnected;
 		this.onMessage = onMessage;
+		this.isSubscribed = false;
+		this.isSubscribing = false;
+	}
+
+	/**
+	 * Creates an instance of a channel subscription
+	 * @param subscribeOnReconnected Indicates if the channel should be subscribe if a reconnect happens
+	 * @param onMessage Event handler that is fired when a message is received in the channel
+	 */
+	public ChannelSubscription(boolean subscribeOnReconnected, OnMessageWithFilter onMessage){
+		this.subscribeOnReconnected = subscribeOnReconnected;
+		this.onMessageWithFilter = onMessage;
 		this.isSubscribed = false;
 		this.isSubscribing = false;
 	}

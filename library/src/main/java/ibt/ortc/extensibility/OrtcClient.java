@@ -791,11 +791,45 @@ public abstract class OrtcClient {
 			subscribedChannel.setSubscribing(true);
 			subscribedChannels.put(channel, subscribedChannel);
 
-			subscribe(channel, subscribeValidation.second);
+			subscribe(channel, subscribeValidation.second, false, "");
 		}
 	}
 
-	protected abstract void subscribe(String channel, String permission);
+
+	/**
+	 * subscribeWithFilter the specified channel with a given filter in order to receive filtered messages in that
+	 * channel
+	 *
+	 * @param channel
+	 *            Channel to be subscribed
+	 * @param subscribeOnReconnect
+	 *            Indicates if the channel should be subscribe if the event on
+	 *            reconnected is fired
+     * @param filter
+     *            The filter to apply to messages on the given channel
+	 * @param onMessageWithFilter
+	 *            Event handler that will be called when a message will be
+	 *            received on the subscribed channel
+	 */
+	public void subscribeWithFilter(String channel, boolean subscribeOnReconnect, String filter,
+						  OnMessageWithFilter onMessageWithFilter) {
+		ChannelSubscription subscribedChannel = subscribedChannels.get(channel);
+		Pair<Boolean, String> subscribeValidation = isSubscribeValid(channel,
+				subscribedChannel);
+
+		if (subscribeValidation != null && subscribeValidation.first) {
+			subscribedChannel = new ChannelSubscription(subscribeOnReconnect,
+                    onMessageWithFilter);
+			subscribedChannel.setFilter(filter);
+			subscribedChannel.setWithFilter(true);
+			subscribedChannel.setSubscribing(true);
+			subscribedChannels.put(channel, subscribedChannel);
+
+			subscribe(channel, subscribeValidation.second, true, filter);
+		}
+	}
+
+	protected abstract void subscribe(String channel, String permission, boolean withFilter, String filter);
 
 	private boolean isUnsubscribeValid(String channelName,
 			ChannelSubscription channel) {
@@ -1263,7 +1297,7 @@ public abstract class OrtcClient {
 						channelName, ChannelPermission.Read);
 
 				if (channelPermission != null && channelPermission.first) {
-					subscribe(channelName, channelPermission.second);
+					subscribe(channelName, channelPermission.second, subscribedChannel.isWithFilter(), subscribedChannel.getFilter());
 				}
 			} else {
 				channelsToRemove.add(channelName);
@@ -1339,18 +1373,21 @@ public abstract class OrtcClient {
 	}
 
 	private void raiseOnReceived(Object... args) {
-		String channel = args != null && args.length == 5 ? (String) args[0]
+		String channel = args != null && args.length == 6 ? (String) args[0]
 				: null;
-		String message = args != null && args.length == 5 ? (String) args[1]
+		String message = args != null && args.length == 6 ? (String) args[1]
 				: null;
-		String messageId = args != null && args.length == 5 ? (String) args[2]
+		String messageId = args != null && args.length == 6 ? (String) args[2]
 				: null;
 
 		// CAUSE: Possible null pointer dereference
-		Integer messagePart = args != null && args.length == 5 ? (Integer) args[3]
+		Integer messagePart = args != null && args.length == 6 ? (Integer) args[3]
 				: null;
 		// CAUSE: Possible null pointer dereference
-		Integer messageTotalParts = args != null && args.length == 5 ? (Integer) args[4]
+		Integer messageTotalParts = args != null && args.length == 6 ? (Integer) args[4]
+				: null;
+
+		Boolean filtered = args != null && args.length == 6 ? (Boolean) args[5]
 				: null;
 
 		if (messagePart != null && messagePart == -1
@@ -1358,20 +1395,37 @@ public abstract class OrtcClient {
 				&& (messagePart == 1 && messageTotalParts == 1)) {
 			ChannelSubscription subscription = subscribedChannels.get(channel);
 			if (subscription != null) {
-				OnMessage onMessageEventHandler = subscription.getOnMessage();
-				if (onMessageEventHandler != null) {
-					message = CharEscaper.removeEsc(message);
-				  onMessageEventHandler.run(this, channel, message);
-					try {						
-						if (messageId != null
-								&& multiPartMessagesBuffer
-										.containsKey(messageId)) {
-							multiPartMessagesBuffer.remove(messageId);
-						}
-					} catch (Exception e) {
-						raiseOrtcEvent(EventEnum.OnException, this, e);
-					}
-				}
+			    if (subscription.isWithFilter()){
+                    OnMessageWithFilter onMessageEventHandler = subscription.getOnMessageWithFilter();
+                    if (onMessageEventHandler != null) {
+                        message = CharEscaper.removeEsc(message);
+                        onMessageEventHandler.run(this, channel, filtered, message);
+                        try {
+                            if (messageId != null
+                                    && multiPartMessagesBuffer
+                                    .containsKey(messageId)) {
+                                multiPartMessagesBuffer.remove(messageId);
+                            }
+                        } catch (Exception e) {
+                            raiseOrtcEvent(EventEnum.OnException, this, e);
+                        }
+                    }
+                }else{
+                    OnMessage onMessageEventHandler = subscription.getOnMessage();
+                    if (onMessageEventHandler != null) {
+                        message = CharEscaper.removeEsc(message);
+                        onMessageEventHandler.run(this, channel, message);
+                        try {
+                            if (messageId != null
+                                    && multiPartMessagesBuffer
+                                    .containsKey(messageId)) {
+                                multiPartMessagesBuffer.remove(messageId);
+                            }
+                        } catch (Exception e) {
+                            raiseOrtcEvent(EventEnum.OnException, this, e);
+                        }
+                    }
+                }
 			}
 		} else {
 			if (!multiPartMessagesBuffer.containsKey(messageId)) {
@@ -1396,7 +1450,7 @@ public abstract class OrtcClient {
 					fullMessage = String.format("%s%s", fullMessage,
 							part.getContent());
 				}
-				raiseOnReceived(channel, fullMessage, messageId, -1, -1);
+				raiseOnReceived(channel, fullMessage, messageId, -1, -1, filtered);
 			}
 		}
 
