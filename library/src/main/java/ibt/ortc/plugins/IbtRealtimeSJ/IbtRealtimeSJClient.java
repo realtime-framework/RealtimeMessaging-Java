@@ -189,7 +189,7 @@ public final class IbtRealtimeSJClient extends OrtcClient {
 
 	private void onReceived(OrtcMessage message) {
 		raiseOrtcEvent(EventEnum.OnReceived, message.getMessageChannel(), message.getMessage(), message.getMessageId(), message.getMessagePart(),
-				message.getMessageTotalParts());
+				message.getMessageTotalParts(), message.isFiltered());
 	}
 
 	@SuppressWarnings("incomplete-switch")
@@ -300,9 +300,12 @@ public final class IbtRealtimeSJClient extends OrtcClient {
 	}
 
 	@Override
-	protected void subscribe(String channel, String permission) {
-		String subscribeMessage = String.format("subscribe;%s;%s;%s;%s", this.applicationKey, this.authenticationToken, channel, permission == null ? null
+	protected void subscribe(String channel, String permission, boolean withFilter, String filter) {
+		String subscribeString = (withFilter == true? "subscribefilter":"subscribe");
+		String subscribeMessage = String.format("%s;%s;%s;%s;%s", subscribeString,this.applicationKey, this.authenticationToken, channel, permission == null ? null
 				: permission);
+		if (withFilter)
+			subscribeMessage = subscribeMessage + ";" + filter;
 		sendMessage(subscribeMessage);
 	}
 

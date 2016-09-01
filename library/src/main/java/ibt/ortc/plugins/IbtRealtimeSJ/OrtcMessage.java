@@ -19,6 +19,7 @@ public class OrtcMessage {
 	private static final String OPERATION_PATTERN = "^a\\[\"\\{\\\\\"op\\\\\":\\\\\"([^\"]+)\\\\\",(.*)\\}\"\\]$";
 	private static final String CHANNEL_PATTERN = "^\\\\\"ch\\\\\":\\\\\"(.*)\\\\\"$";
 	private static final String RECEIVED_PATTERN = "^a?\\[\"\\{\\\\\"ch\\\\\":\\\\\"(.*)\\\\\",\\\\\"m\\\\\":\\\\\"([\\s\\S]*?)\\\\\"\\}\"\\]$";
+	private static final String RECEIVED_PATTERN_FILTERED = "^a?\\[\"\\{\\\\\"ch\\\\\":\\\\\"(.*)\\\\\",\\\\\"f\\\\\":(.*),\\\\\"m\\\\\":\\\\\"([\\s\\S]*?)\\\\\"\\}\"\\]$";
 	private static final String MULTI_PART_MESSAGE_PATTERN = "^(.[^_]*)_(.[^-]*)-(.[^_]*)_([\\s\\S]*?)$";
 	private static final String EXCEPTION_PATTERN = "^\\\\\"ex\\\\\":(\\{.*\\})$";
 	private static final String PERMISSIONS_PATTERN = "^\\\\\"up\\\\\":{1}(.*),\\\\\"set\\\\\":(.*)$";
@@ -26,10 +27,12 @@ public class OrtcMessage {
 	private static Pattern operationPattern;
 	private static Pattern subscribedPattern;
 	private static Pattern receivedPattern;
+	private static Pattern receivedPatternFiltered;
 	private static Pattern multipartMessagePattern;
 	private static Pattern unsubscribedPattern;
 	private static Pattern exceptionPattern;
 	private static Pattern permissionsPattern;
+	private final boolean filtered;
 
 	private OrtcOperation operation;
 	private String message;
@@ -45,6 +48,7 @@ public class OrtcMessage {
 		operationPattern = Pattern.compile(OPERATION_PATTERN);
 		subscribedPattern = Pattern.compile(CHANNEL_PATTERN);
 		receivedPattern = Pattern.compile(RECEIVED_PATTERN);
+		receivedPatternFiltered = Pattern.compile(RECEIVED_PATTERN_FILTERED);
 		multipartMessagePattern = Pattern.compile(MULTI_PART_MESSAGE_PATTERN);
 		unsubscribedPattern = Pattern.compile(CHANNEL_PATTERN);
 		exceptionPattern = Pattern.compile(EXCEPTION_PATTERN);
@@ -63,13 +67,14 @@ public class OrtcMessage {
 		errorOperationIndex.put("send_maxsize", OrtcServerErrorException.OrtcServerErrorOperation.Send_MaxSize);
 	}
 
-	public OrtcMessage(OrtcOperation operation, String message, String messageChannel, String messageId, int messagePart, int messageTotalParts) {
+	public OrtcMessage(OrtcOperation operation, String message, String messageChannel, String messageId, int messagePart, int messageTotalParts, boolean filtered) {
 		this.operation = operation;
 		this.message = message;
 		this.messageChannel = messageChannel;
 		this.messageId = messageId;
 		this.messagePart = messagePart;
 		this.messageTotalParts = messageTotalParts;
+		this.filtered = filtered;
 	}
 
 	public static OrtcMessage parseMessage(String message) throws OrtcInvalidMessageException {
@@ -77,6 +82,7 @@ public class OrtcMessage {
 		String parsedMessage = null;
 		String messageChannel = null;
 		String messageId = null;
+		String filtered = null;
 		int messagePart = -1;
 		int messageTotalParts = -1;
 
@@ -85,6 +91,7 @@ public class OrtcMessage {
 		if (matcher != null && !matcher.matches()) {
 			// matcher = receivedPattern.matcher(message.replace("\\\"", "\""));
 			matcher = receivedPattern.matcher(message);
+			Matcher matcherFiltered = receivedPatternFiltered.matcher(message);
 
 			if (matcher != null && matcher.matches()) {
 				operation = OrtcOperation.Received;
@@ -106,7 +113,30 @@ public class OrtcMessage {
 					messagePart = -1;
 					messageTotalParts = -1;
 				}
-			} else {
+			} else if(matcherFiltered != null && matcherFiltered.matches()){
+				operation = OrtcOperation.Received;
+
+                messageChannel = matcherFiltered.group(1);
+				filtered = matcherFiltered.group(2);
+                parsedMessage = matcherFiltered.group(3);
+
+				Matcher multiPartMatcher = parseMultiPartMessage(parsedMessage);
+
+				try {
+					if (multiPartMatcher.matches()) {
+						parsedMessage = multiPartMatcher.group(4);
+						messageId = multiPartMatcher.group(1);
+						messagePart = Strings.isNullOrEmpty(multiPartMatcher.group(2)) ? -1 : Integer.parseInt(multiPartMatcher.group(2));
+						messageTotalParts = Strings.isNullOrEmpty(multiPartMatcher.group(3)) ? -1 : Integer.parseInt(multiPartMatcher.group(3));
+					}
+				} catch (NumberFormatException parseException) {
+					parsedMessage = matcherFiltered.group(2);
+					messageId = null;
+					messagePart = -1;
+					messageTotalParts = -1;
+				}
+			}
+			else {
 				throw new OrtcInvalidMessageException(String.format("Invalid message format: %s", message));
 			}
 		} else {
@@ -114,7 +144,7 @@ public class OrtcMessage {
 			parsedMessage = matcher.group(2);
 		}
 
-		return new OrtcMessage(operation, parsedMessage, messageChannel, messageId, messagePart, messageTotalParts);
+		return new OrtcMessage(operation, parsedMessage, messageChannel, messageId, messagePart, messageTotalParts, Boolean.parseBoolean(filtered));
 	}
 
 	private static Matcher parseMultiPartMessage(String message) {
@@ -162,6 +192,10 @@ public class OrtcMessage {
 		}
 
 		return result;
+	}
+
+	public boolean isFiltered() {
+		return filtered;
 	}
 
 	public String channelSubscribed() throws Exception {
