@@ -21,8 +21,14 @@ public class ChannelSubscription {
 	private boolean subscribeOnReconnected;
 	private OnMessage onMessage;
     private OnMessageWithFilter onMessageWithFilter;
+    private OnMessageWithOptions onMessageWithOptions;
+    private OnMessageWithBuffer onMessageWithBuffer;
 	private String filter;
+    private String subscriberId;
 	private boolean isWithFilter;
+    private boolean isWithBuffer;
+    private boolean isWithOptions;
+
 
     public String getFilter() {
         return filter;
@@ -43,6 +49,31 @@ public class ChannelSubscription {
     public OnMessageWithFilter getOnMessageWithFilter() {
         return onMessageWithFilter;
     }
+
+    public OnMessageWithOptions getOnMessageWithOptions() { return onMessageWithOptions; }
+
+    public OnMessageWithBuffer getOnMessageWithBuffer() { return onMessageWithBuffer; }
+
+    public String getSubscriberId() {
+        return subscriberId;
+    }
+
+    public void setSubscriberId(String subscriberId) {
+        this.subscriberId = subscriberId;
+    }
+
+    public boolean isWithBuffer() {
+        return isWithBuffer;
+    }
+
+    public void setWithBuffer(boolean withBuffer) {
+        isWithBuffer = withBuffer;
+    }
+
+    public boolean isWithOptions() { return isWithOptions; }
+
+    public void setWithOptions(boolean withOptions) { isWithOptions = withOptions; }
+
 
     /**
 	 * Creates an instance of a channel subscription
@@ -67,7 +98,31 @@ public class ChannelSubscription {
 		this.isSubscribed = false;
 		this.isSubscribing = false;
 	}
-	
+
+    /**
+     * Creates an instance of a channel subscription
+     * @param subscribeOnReconnected Indicates if the channel should be subscribe if a reconnect happens
+     * @param onMessage Event handler that is fired when a message is received in the channel
+     */
+    public ChannelSubscription(boolean subscribeOnReconnected, OnMessageWithBuffer onMessage){
+        this.subscribeOnReconnected = subscribeOnReconnected;
+        this.onMessageWithBuffer = onMessage;
+        this.isSubscribed = false;
+        this.isSubscribing = false;
+    }
+
+    /**
+     * Creates an instance of a channel subscription
+     * @param subscribeOnReconnected Indicates if the channel should be subscribe if a reconnect happens
+     * @param onMessage Event handler that is fired when a message is received in the channel
+     */
+    public ChannelSubscription(boolean subscribeOnReconnected, OnMessageWithOptions onMessage){
+        this.subscribeOnReconnected = subscribeOnReconnected;
+        this.onMessageWithOptions = onMessage;
+        this.isSubscribed = false;
+        this.isSubscribing = false;
+    }
+
 	/**
 	 * Indicates whether the channel is being subscribed or not
 	 * @return boolean True if is subscribing the channel otherwise false

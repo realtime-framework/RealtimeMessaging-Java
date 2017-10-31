@@ -97,13 +97,15 @@ public class Main {
         System.out.println(" Commands List:");
         System.out.println("");
         System.out.println(" 0 - Connect");
-        System.out.println(" 1 - Subscribe to channel");
-        System.out.println(" 2 - Unsubscribe from channel");
-        System.out.println(" 3 - Send message to channel");
-        System.out.println(" 4 - Disconnect ");
-        System.out.println(" 5 - Presence ");
-        System.out.println(" 6 - Enable Presence ");
-        System.out.println(" 7 - Disable Presence ");
+        System.out.println(" 1 - Subscribe to channel (using at-most-once delivery)");
+        System.out.println(" 2 - Subscribe to channel (using at-least-once delivery)");
+        System.out.println(" 3 - Unsubscribe from channel");
+        System.out.println(" 4 - Send message to channel");
+        System.out.println(" 5 - Publish message to channel");
+        System.out.println(" 6 - Disconnect ");
+        System.out.println(" 7 - Presence ");
+        System.out.println(" 8 - Enable Presence ");
+        System.out.println(" 9 - Disable Presence ");
         System.out.println("");
         System.out.println("========== Ortc Integration Test Menu ==========");
     }
@@ -117,6 +119,8 @@ public class Main {
 
         String channel = "";
         String message = "";
+        String subscriberId = "";
+        int ttl = 60;
 
         switch (command) {
             case 0:
@@ -128,14 +132,24 @@ public class Main {
                 channel = in.nextLine();
                 System.out.println("Subscribing to " + channel + "...");
                 subscribeChannel(client, channel);
+                readMenuCommand(client);
                 break;
             case 2:
+                System.out.println("channel:");
+                channel = in.nextLine();
+                System.out.println("subscriberId:");
+                subscriberId = in.nextLine();
+                System.out.println("Subscribing to " + channel + " with subscriberId=" + subscriberId + " ...");
+                subscribeChannelWithOptions(client, channel, subscriberId);
+                readMenuCommand(client);
+                break;
+            case 3:
                 System.out.println("channel:");
                 channel = in.nextLine();
                 System.out.println("Unsubscribing from " + channel + "...");
                 client.unsubscribe(channel);
                 break;
-            case 3:
+            case 4:
                 System.out.println("channel:");
                 channel = in.nextLine();
                 System.out.println("message:");
@@ -144,17 +158,37 @@ public class Main {
                 client.send(channel, message);
                 readMenuCommand(client);
                 break;
-            case 4:
+            case 5:
+                System.out.println("channel:");
+                final String pChannel = in.nextLine();
+                System.out.println("message:");
+                final String pMessage = in.nextLine();
+                System.out.println("ttl (in seconds):");
+                ttl = Integer.parseInt(in.nextLine());
+                System.out.println("Publishing " + pMessage + " to " + pChannel + " with ttl of " + ttl + " seconds");
+                client.publish(pChannel, pMessage, ttl, new OnPublishResult() {
+                    @Override
+                    public void run(String error, String seqId) {
+                        if(error == null) {
+                            System.out.println("Published " + pMessage + " to " + pChannel + " with seqId: " + seqId);
+                        } else {
+                            System.out.println("Error publishing message " + pMessage + " to " + pChannel + " Error: " + error);
+                        }
+                    }
+                });
+                readMenuCommand(client);
+                break;
+            case 6:
                 System.out.println("Disconnecting...");
                 client.disconnect();
                 break;
-            case 5:
+            case 7:
                 System.out.println("channel:");
                 channel = in.nextLine();
                 getPresence(channel);
                 readMenuCommand(client);
                 break;
-            case 6:
+            case 8:
                 System.out.println("channel:");
                 channel = in.nextLine();
                 System.out.println("metadata:");
@@ -162,7 +196,7 @@ public class Main {
                 enablePresence(channel,metadata);
                 readMenuCommand(client);
                 break;
-            case 7:
+            case 9:
                 System.out.println("channel:");
                 channel = in.nextLine();
                 disablePresence(channel);
@@ -229,13 +263,26 @@ public class Main {
         client.subscribe(channel, true, new OnMessage() {
             @Override
             public void run(OrtcClient sender, String channel, String message) {
-                System.out.println(String.format("Message received on channel %s: '%s'", channel, message));
+                System.out.println(String.format("Message received on channel %s: %s", channel, message));
+            }
+        });
+    }
 
-                if ("unsubscribe".equals(message)) {
-                    ((OrtcClient) sender).unsubscribe(channel);
-                } else if ("disconnect".equals(message)) {
-                    ((OrtcClient) sender).disconnect();
-                }
+    private static void subscribeChannelWithOptions(OrtcClient client, String channel, String subscriberId) {
+        Map options = new HashMap();
+        options.put("channel", channel);
+        options.put("subscriberId", subscriberId);
+        //options.put("filter", "message.a = 40");
+
+        client.subscribeWithOptions(options, new OnMessageWithOptions() {
+            @Override
+            public void run(OrtcClient sender, Map msgOptions) {
+                String channel = (String) msgOptions.get("channel");
+                String message = (String) msgOptions.get("message");
+                Boolean isFiltered = (Boolean) msgOptions.get("filtered");
+                String seqId = (String) msgOptions.get("seqId");
+
+                System.out.println(String.format("Message received on channel %s with seqId %s filtered=%b: %s", channel, seqId, isFiltered, message));
             }
         });
     }
@@ -346,7 +393,7 @@ public class Main {
         client.onSubscribed = new OnSubscribed() {
             @Override
             public void run(OrtcClient sender, String channel) {
-                System.out.println(String.format("Subscribed to channel %s (Receive the message 'unsubscribe' to stop receiving and enter commands)", channel));
+                System.out.println(String.format("Subscribed to channel %s", channel));
 
             }
         };

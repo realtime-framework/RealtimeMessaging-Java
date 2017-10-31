@@ -25,11 +25,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Hashtable;
-import java.util.LinkedList;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Abstract class representing an Ortc Client
@@ -399,6 +395,10 @@ public abstract class OrtcClient {
 	protected int heartbeatFails = 3;
 	protected int heartbeatTime = 15;
 	protected HeartbeatSender heartbeatSender = null;
+
+    private int publishTimeout = 5000;
+    protected HashMap pendingPublishMessages = new HashMap();
+    private Timer partSendInterval;
 	
 	// ========== Properties ==========
 
@@ -673,7 +673,85 @@ public abstract class OrtcClient {
 		}
 	}
 
-	private ArrayList<Pair<String, String>> multiPartMessage(String message,
+    /**
+     * Publish a message to a channel.
+     *
+     * @param channel
+     *            Channel to wich the message should be sent
+     * @param message
+     *            The content of the message to be sent
+     * @param ttl
+     *            The message expiration time in seconds (0 for maximum allowed ttl).
+     * @param callback
+     *            Returns error if message publish was not successful or published message unique id (seqId) if sucessfully published
+     */
+
+    public void publish(final String channel, String message, final int ttl, OnPublishResult callback) {
+        final Pair<Boolean, String> sendValidation = isSendValid(channel, message, null, null);
+
+        if (sendValidation != null && sendValidation.first) {
+            try {
+                final String messageId = Strings.randomString(8);
+
+                final ArrayList<Pair<String, String>> messagesToSend = multiPartMessage(message, messageId);
+
+                final Timer ackTimeout = new Timer();
+
+                ackTimeout.schedule(new TimerTask() {
+                    public void run() {
+                        if (pendingPublishMessages.containsKey(messageId)) {
+                            String err = String.format("Message publish timeout after %d seconds", publishTimeout / 1000);
+                            if (pendingPublishMessages != null && ((HashMap) pendingPublishMessages.get(messageId)).containsKey("callback")) {
+                                OnPublishResult callbackP = (OnPublishResult) ((HashMap) pendingPublishMessages.get(messageId)).get("callback");
+                                callbackP.run(err, null);
+                            }
+                            pendingPublishMessages.remove(messageId);
+                        }
+                    }
+                }, publishTimeout);
+
+                Map pendingMsg = new HashMap();
+                pendingMsg.put("totalNumOfParts", messagesToSend.size());
+                pendingMsg.put("callback", callback);
+                pendingMsg.put("timeout", ackTimeout);
+
+                this.pendingPublishMessages.put(messageId, pendingMsg);
+
+                if (messagesToSend.size() < 20) {
+                    for (Pair<String, String> messageToSend : messagesToSend) {
+                        publish(channel, messageToSend.second, ttl, messageToSend.first,
+                                sendValidation.second);
+                    }
+                } else {
+                    partSendInterval = new Timer();
+
+                    // send each message part with 100ms delay between them to avoid server throttling
+                    partSendInterval.schedule(new TimerTask() {
+                        int partsSent = 0;
+
+                        public void run() {
+                            if (isConnected) {
+                                Pair<String, String> messageToSend = messagesToSend.get(partsSent);
+                                publish(channel, messageToSend.second, ttl, messageToSend.first,
+                                        sendValidation.second);
+                                partsSent++;
+                                if(partsSent == messagesToSend.size()) {
+                                    partSendInterval.cancel();
+                                }
+                            }
+                        }
+                    }, 0, 100);
+                }
+            }catch(IOException e){
+                raiseOrtcEvent(EventEnum.OnException, this, e);
+            }
+        }
+    }
+
+    protected abstract void publish(String channel, String message, int ttl, String messagePartIdentifier, String permission);
+
+
+    private ArrayList<Pair<String, String>> multiPartMessage(String message,
 			String messageId) throws IOException {
 		// CAUSE: Reliance on default encoding
 		byte[] messageBytes = message.getBytes("UTF-8");
@@ -829,7 +907,69 @@ public abstract class OrtcClient {
 		}
 	}
 
+	/**
+	 * Subscribes to a channel to receive messages sent to it with given options.
+	 *
+	 * @param options
+	 *          The subscription options dictionary, EX: "options = {
+	 * channel,
+	 * subscribeOnReconnected, // optional, default = true,
+	 * filter, // optional, default = "", the subscription filter as in subscribeWithFilter
+	 * subscriberId // optional, default = "", the subscriberId as in subscribeWithBuffer
+	 * }".
+	 * @param onMessage
+	 *          The callback called when a message arrives at the channel, data is provided in a dictionary.
+	 */
+	public void subscribeWithOptions(Map options, OnMessageWithOptions onMessage){
+		if(options != null){
+			String channel = null;
+			Boolean subscribeOnReconnected = true;
+			String filter = null;
+			String subscriberId = null;
+
+			if (options.containsKey("channel")){
+				channel = (String) options.get("channel");
+			}
+			if (options.containsKey("subscribeOnReconnected")){
+				subscribeOnReconnected = (Boolean) options.get("subscribeOnReconnected");
+			}
+			if (options.containsKey("filter")){
+				filter = (String) options.get("filter");
+			}
+			if (options.containsKey("subscriberId")){
+				subscriberId = (String) options.get("subscriberId");
+			}
+
+			ChannelSubscription subscribedChannel = subscribedChannels.get(channel);
+			Pair<Boolean, String> subscribeValidation = isSubscribeValid(channel,
+					subscribedChannel);
+
+			if (subscribeValidation != null && subscribeValidation.first) {
+				subscribedChannel = new ChannelSubscription(subscribeOnReconnected,
+						onMessage);
+				subscribedChannel.setSubscribing(true);
+				subscribedChannel.setFilter(filter);
+				subscribedChannel.setSubscriberId(subscriberId);
+				subscribedChannel.setWithOptions(true);
+				subscribedChannels.put(channel, subscribedChannel);
+
+				this._subscribeWithOptions(channel,subscribeValidation.second, subscribeOnReconnected, filter, subscriberId);
+			}
+		}else{
+			raiseOrtcEvent(
+					EventEnum.OnException,
+					this,
+					new OrtcSubscribedException(String.format(
+							"subscribeWithOptions called with no options")));
+		}
+	}
+
 	protected abstract void subscribe(String channel, String permission, boolean withFilter, String filter);
+
+    protected abstract void sendAck(String channel, String messageId, String seqId, String asAllParts);
+
+    protected abstract void _subscribeWithOptions(String channel, String permission, boolean subscribeOnReconnected,
+                                                  String filter,String subscriberId);
 
 	private boolean isUnsubscribeValid(String channelName,
 			ChannelSubscription channel) {
@@ -1194,6 +1334,25 @@ public abstract class OrtcClient {
 		this.proxy = proxy;
 	}
 
+    /**
+     * Gets the publish operation timeout
+     *
+     * @return int Publish operation timeout in miliseconds (default 5000ms)
+     */
+    public int getPublishTimeout() {
+        return publishTimeout;
+    }
+
+    /**
+     * Sets the publish operation timeout
+     *
+     * @param publishTimeout
+     *            Publish operation timeout in miliseconds (default is 5000ms)
+     */
+    public void setPublishTimeout(int publishTimeout) {
+        this.publishTimeout = publishTimeout;
+    }
+
 	// ========== Getters and Setters ==========
 
 	// ========== Raise of events ==========
@@ -1297,7 +1456,13 @@ public abstract class OrtcClient {
 						channelName, ChannelPermission.Read);
 
 				if (channelPermission != null && channelPermission.first) {
-					subscribe(channelName, channelPermission.second, subscribedChannel.isWithFilter(), subscribedChannel.getFilter());
+                    if (subscribedChannel.isWithOptions()) {
+                        _subscribeWithOptions(channelName, channelPermission.second, true,
+                                subscribedChannel.getFilter(), subscribedChannel.getSubscriberId());
+                    } else {
+                        subscribe(channelName, channelPermission.second,
+                                subscribedChannel.isWithFilter(), subscribedChannel.getFilter());
+                    }
 				}
 			} else {
 				channelsToRemove.add(channelName);
@@ -1373,22 +1538,25 @@ public abstract class OrtcClient {
 	}
 
 	private void raiseOnReceived(Object... args) {
-		String channel = args != null && args.length == 6 ? (String) args[0]
+		String channel = args != null && args.length == 7 ? (String) args[0]
 				: null;
-		String message = args != null && args.length == 6 ? (String) args[1]
+		String message = args != null && args.length == 7 ? (String) args[1]
 				: null;
-		String messageId = args != null && args.length == 6 ? (String) args[2]
+		String messageId = args != null && args.length == 7 ? (String) args[2]
 				: null;
 
 		// CAUSE: Possible null pointer dereference
-		Integer messagePart = args != null && args.length == 6 ? (Integer) args[3]
+		Integer messagePart = args != null && args.length == 7 ? (Integer) args[3]
 				: null;
 		// CAUSE: Possible null pointer dereference
-		Integer messageTotalParts = args != null && args.length == 6 ? (Integer) args[4]
+		Integer messageTotalParts = args != null && args.length == 7 ? (Integer) args[4]
 				: null;
 
-		Boolean filtered = args != null && args.length == 6 ? (Boolean) args[5]
+		Boolean filtered = args != null && args.length == 7 ? (Boolean) args[5]
 				: null;
+
+        String seqId = args != null && args.length == 7 ? (String) args[6]
+                : null;
 
 		if (messagePart != null && messagePart == -1
 				|| (messagePart != null && messageTotalParts != null)
@@ -1410,7 +1578,55 @@ public abstract class OrtcClient {
                             raiseOrtcEvent(EventEnum.OnException, this, e);
                         }
                     }
-                }else{
+                } else if(subscription.isWithBuffer()) {
+			        OnMessageWithBuffer onMessageEventHandler = subscription.getOnMessageWithBuffer();
+                    if (onMessageEventHandler != null) {
+                        message = CharEscaper.removeEsc(message);
+                        onMessageEventHandler.run(this, channel, seqId, message);
+                        try {
+                            if (messageId != null
+                                    && multiPartMessagesBuffer
+                                    .containsKey(messageId)) {
+                                multiPartMessagesBuffer.remove(messageId);
+                            }
+                        } catch (Exception e) {
+                            raiseOrtcEvent(EventEnum.OnException, this, e);
+                        }
+                    }
+                } else if (subscription.isWithOptions()) {
+			        OnMessageWithOptions onMessageEventHandler = subscription.getOnMessageWithOptions();
+                    if (onMessageEventHandler != null) {
+                        message = CharEscaper.removeEsc(message);
+
+                        Map msgOptions = new HashMap();
+                        msgOptions.put("channel", channel);
+                        msgOptions.put("message", message);
+
+                        if(seqId != null) {
+                            msgOptions.put("seqId", seqId);
+                        }
+
+                        if (filtered != null){
+                            msgOptions.put("filtered", ((Boolean) filtered).booleanValue());
+                        }
+
+                        onMessageEventHandler.run(this, msgOptions);
+
+                        if(seqId != null) {
+                            sendAck(channel, messageId, seqId, "1");
+                        }
+
+                        try {
+                            if (messageId != null
+                                    && multiPartMessagesBuffer
+                                    .containsKey(messageId)) {
+                                multiPartMessagesBuffer.remove(messageId);
+                            }
+                        } catch (Exception e) {
+                            raiseOrtcEvent(EventEnum.OnException, this, e);
+                        }
+                    }
+                } else {
                     OnMessage onMessageEventHandler = subscription.getOnMessage();
                     if (onMessageEventHandler != null) {
                         message = CharEscaper.removeEsc(message);
@@ -1450,8 +1666,17 @@ public abstract class OrtcClient {
 					fullMessage = String.format("%s%s", fullMessage,
 							part.getContent());
 				}
-				raiseOnReceived(channel, fullMessage, messageId, -1, -1, filtered);
-			}
+
+                if(seqId != null) {
+                    sendAck(channel, messageId, seqId, "1");
+                }
+
+				raiseOnReceived(channel, fullMessage, messageId, -1, -1, filtered, seqId);
+			} else {
+                if(seqId != null) {
+                    sendAck(channel, messageId, seqId, "0");
+                }
+            }
 		}
 
 	}

@@ -6,6 +6,7 @@ package ibt.ortc.plugins.IbtRealtimeSJ;
 import ibt.ortc.api.Strings;
 import ibt.ortc.extensibility.exception.OrtcInvalidMessageException;
 
+import java.io.IOException;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Map;
@@ -16,6 +17,8 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
 public class OrtcMessage {
+    private static final String JSON_PATTERN = "^a\\[\"(.*?)\"\\]$";
+    private static final String SEQ_ID_PATTERN = "^#(.*?):";
 	private static final String OPERATION_PATTERN = "^a\\[\"\\{\\\\\"op\\\\\":\\\\\"([^\"]+)\\\\\",(.*)\\}\"\\]$";
 	private static final String CHANNEL_PATTERN = "^\\\\\"ch\\\\\":\\\\\"(.*)\\\\\"$";
 	private static final String RECEIVED_PATTERN = "^a?\\[\"\\{\\\\\"ch\\\\\":\\\\\"(.*)\\\\\",\\\\\"m\\\\\":\\\\\"([\\s\\S]*?)\\\\\"\\}\"\\]$";
@@ -23,7 +26,10 @@ public class OrtcMessage {
 	private static final String MULTI_PART_MESSAGE_PATTERN = "^(.[^_]*)_(.[^-]*)-(.[^_]*)_([\\s\\S]*?)$";
 	private static final String EXCEPTION_PATTERN = "^\\\\\"ex\\\\\":(\\{.*\\})$";
 	private static final String PERMISSIONS_PATTERN = "^\\\\\"up\\\\\":{1}(.*),\\\\\"set\\\\\":(.*)$";
+    private static final String CLOSE_PATTERN = "^c\\[\\d\\d\\d\\d,\"([\\s\\S])*\"]$";
 
+    private static Pattern JSONPattern;
+    private static Pattern SeqIdPattern;
 	private static Pattern operationPattern;
 	private static Pattern subscribedPattern;
 	private static Pattern receivedPattern;
@@ -32,7 +38,9 @@ public class OrtcMessage {
 	private static Pattern unsubscribedPattern;
 	private static Pattern exceptionPattern;
 	private static Pattern permissionsPattern;
+    private static Pattern closePattern;
 	private final boolean filtered;
+	private final String seqId;
 
 	private OrtcOperation operation;
 	private String message;
@@ -45,6 +53,8 @@ public class OrtcMessage {
 			11);
 
 	static {
+        JSONPattern = Pattern.compile(JSON_PATTERN);
+        SeqIdPattern = Pattern.compile(SEQ_ID_PATTERN);
 		operationPattern = Pattern.compile(OPERATION_PATTERN);
 		subscribedPattern = Pattern.compile(CHANNEL_PATTERN);
 		receivedPattern = Pattern.compile(RECEIVED_PATTERN);
@@ -53,11 +63,13 @@ public class OrtcMessage {
 		unsubscribedPattern = Pattern.compile(CHANNEL_PATTERN);
 		exceptionPattern = Pattern.compile(EXCEPTION_PATTERN);
 		permissionsPattern = Pattern.compile(PERMISSIONS_PATTERN);
+        closePattern = Pattern.compile(CLOSE_PATTERN);
 
 		operationIndex.put("ortc-validated", OrtcOperation.Validated);
 		operationIndex.put("ortc-subscribed", OrtcOperation.Subscribed);
 		operationIndex.put("ortc-unsubscribed", OrtcOperation.Unsubscribed);
 		operationIndex.put("ortc-error", OrtcOperation.Error);
+        operationIndex.put("ortc-ack", OrtcOperation.ack);
 
 		errorOperationIndex.put("ex", OrtcServerErrorException.OrtcServerErrorOperation.Unexpected);
 		errorOperationIndex.put("validate", OrtcServerErrorException.OrtcServerErrorOperation.Validate);
@@ -67,7 +79,7 @@ public class OrtcMessage {
 		errorOperationIndex.put("send_maxsize", OrtcServerErrorException.OrtcServerErrorOperation.Send_MaxSize);
 	}
 
-	public OrtcMessage(OrtcOperation operation, String message, String messageChannel, String messageId, int messagePart, int messageTotalParts, boolean filtered) {
+	public OrtcMessage(OrtcOperation operation, String message, String messageChannel, String messageId, int messagePart, int messageTotalParts, boolean filtered, String seqId) {
 		this.operation = operation;
 		this.message = message;
 		this.messageChannel = messageChannel;
@@ -75,79 +87,94 @@ public class OrtcMessage {
 		this.messagePart = messagePart;
 		this.messageTotalParts = messageTotalParts;
 		this.filtered = filtered;
+		this.seqId = seqId;
 	}
 
 	public static OrtcMessage parseMessage(String message) throws OrtcInvalidMessageException {
-		OrtcOperation operation = null;
-		String parsedMessage = null;
-		String messageChannel = null;
-		String messageId = null;
-		String filtered = null;
-		int messagePart = -1;
-		int messageTotalParts = -1;
+        OrtcOperation operation = null;
+        String JSONMessage = null;
+        String parsedMessage = null;
+        Boolean filteredByServer = false;
+        String seqId = null;
+        String messageChannel = null;
+        String messageId = null;
+        int messagePart = -1;
+        int messageTotalParts = -1;
 
-		Matcher matcher = operationPattern.matcher(message);
+        Matcher matcher = operationPattern.matcher(message);
 
-		if (matcher != null && !matcher.matches()) {
-			// matcher = receivedPattern.matcher(message.replace("\\\"", "\""));
-			matcher = receivedPattern.matcher(message);
-			Matcher matcherFiltered = receivedPatternFiltered.matcher(message);
+        if (matcher != null && !matcher.matches()) {
+            matcher = JSONPattern.matcher(message);
 
-			if (matcher != null && matcher.matches()) {
-				operation = OrtcOperation.Received;
-				parsedMessage = matcher.group(2);
-				messageChannel = matcher.group(1);
+            if ((matcher != null && matcher.matches())) {
+                try{
+                    operation = OrtcOperation.Received;
+                    JSONMessage = matcher.group(1).replace("\\\\", "\\").replace("\\\"","\"");
+                    JSONObject json = (JSONObject) (JSONValue.parse(JSONMessage));
 
-				Matcher multiPartMatcher = parseMultiPartMessage(parsedMessage);
+                    parsedMessage = (String)json.get("m");
+                    messageChannel = (String)json.get("ch");
 
-				try {
-					if (multiPartMatcher.matches()) {
-						parsedMessage = multiPartMatcher.group(4);
-						messageId = multiPartMatcher.group(1);
-						messagePart = Strings.isNullOrEmpty(multiPartMatcher.group(2)) ? -1 : Integer.parseInt(multiPartMatcher.group(2));
-						messageTotalParts = Strings.isNullOrEmpty(multiPartMatcher.group(3)) ? -1 : Integer.parseInt(multiPartMatcher.group(3));
-					}
-				} catch (NumberFormatException parseException) {
-					parsedMessage = matcher.group(2);
-					messageId = null;
-					messagePart = -1;
-					messageTotalParts = -1;
-				}
-			} else if(matcherFiltered != null && matcherFiltered.matches()){
-				operation = OrtcOperation.Received;
+                    if (json.containsKey("f"))
+                        filteredByServer = (Boolean)json.get("f");
 
-                messageChannel = matcherFiltered.group(1);
-				filtered = matcherFiltered.group(2);
-                parsedMessage = matcherFiltered.group(3);
+                    if (json.containsKey("s"))
+                        seqId = (String)json.get("s");
 
-				Matcher multiPartMatcher = parseMultiPartMessage(parsedMessage);
+                    Matcher multiPartMatcher = parseMultiPartMessage(parsedMessage);
 
-				try {
-					if (multiPartMatcher.matches()) {
-						parsedMessage = multiPartMatcher.group(4);
-						messageId = multiPartMatcher.group(1);
-						messagePart = Strings.isNullOrEmpty(multiPartMatcher.group(2)) ? -1 : Integer.parseInt(multiPartMatcher.group(2));
-						messageTotalParts = Strings.isNullOrEmpty(multiPartMatcher.group(3)) ? -1 : Integer.parseInt(multiPartMatcher.group(3));
-					}
-				} catch (NumberFormatException parseException) {
-					parsedMessage = matcherFiltered.group(2);
-					messageId = null;
-					messagePart = -1;
-					messageTotalParts = -1;
-				}
-			}
-			else {
-				throw new OrtcInvalidMessageException(String.format("Invalid message format: %s", message));
-			}
-		} else {
-			operation = operationIndex.get(matcher.group(1));
-			parsedMessage = matcher.group(2);
-		}
+                    if (multiPartMatcher.matches()) {
+                        parsedMessage = multiPartMatcher.group(4);
+                        messageId = multiPartMatcher.group(1);
+                        messagePart = Strings.isNullOrEmpty(multiPartMatcher.group(2)) ? -1 : Integer.parseInt(multiPartMatcher.group(2));
+                        messageTotalParts = Strings.isNullOrEmpty(multiPartMatcher.group(3)) ? -1 : Integer.parseInt(multiPartMatcher.group(3));
+                    }
+                }catch(NumberFormatException parseException){
+                    parsedMessage = matcher.group(1);
+                    messageId = null;
+                    messagePart = -1;
+                    messageTotalParts = -1;
+                } catch (Exception e) {
+                    parsedMessage = matcher.group(1);
+                    messageId = null;
+                    messagePart = -1;
+                    messageTotalParts = -1;
+                }
+            } else {
+                matcher = closePattern.matcher(message);
+                if (matcher != null && matcher.matches()){
+                    operation = OrtcOperation.Close;
+                } else {
+                    throw new OrtcInvalidMessageException(String.format("Invalid message format: %s", message));
+                }
+            }
+            // CAUSE: Possible null pointer dereference
+        } else {
+            operation = operationIndex.get(matcher.group(1));
+            parsedMessage = matcher.group(2);
+        }
 
-		return new OrtcMessage(operation, parsedMessage, messageChannel, messageId, messagePart, messageTotalParts, Boolean.parseBoolean(filtered));
+        return new OrtcMessage(operation, parsedMessage, messageChannel, messageId, messagePart, messageTotalParts, filteredByServer, seqId);
 	}
 
-	private static Matcher parseMultiPartMessage(String message) {
+    public static JSONObject parseJSON(String message){
+        String JSONMessage = null;
+        Matcher matcher = JSONPattern.matcher(message);
+        if ((matcher != null && matcher.matches()))
+        {
+            try {
+                JSONMessage = matcher.group(1).replace("\\", "");
+                JSONObject json = (JSONObject) (JSONValue.parse(JSONMessage));
+                return json;
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+
+    private static Matcher parseMultiPartMessage(String message) {
 		Matcher result = multipartMessagePattern.matcher(message);
 
 		return result;
@@ -265,4 +292,6 @@ public class OrtcMessage {
 	public int getMessageTotalParts() {
 		return messageTotalParts;
 	}
+
+	public String getSeqId() { return seqId; }
 }

@@ -1,11 +1,11 @@
 package ibt.ortc.plugins.IbtRealtimeSJ;
 
 import ibt.ortc.api.Strings;
-//import ibt.ortc.extensibility.CharEscaper;
 import ibt.ortc.extensibility.EventEnum;
 import ibt.ortc.extensibility.OrtcClient;
 import ibt.ortc.extensibility.exception.OrtcInvalidMessageException;
 import ibt.ortc.extensibility.exception.OrtcNotConnectedException;
+import ibt.ortc.extensibility.OnPublishResult;
 import ibt.ortc.plugins.IbtRealtimeSJ.OrtcServerErrorException.OrtcServerErrorOperation;
 import ibt.ortc.plugins.websocket.WebSocket;
 import ibt.ortc.plugins.websocket.WebSocketConnection;
@@ -18,9 +18,11 @@ import ibt.ortc.plugins.websocket.WebSocketStreamException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Random;
+import java.util.Timer;
 
-import org.json.simple.JSONValue;
+import org.json.simple.*;
 
 public final class IbtRealtimeSJClient extends OrtcClient {
 	private static final Integer HEARTBEAT_TIMEOUT = 30;
@@ -90,6 +92,29 @@ public final class IbtRealtimeSJClient extends OrtcClient {
 		heartBeatThread.start();
 	}
 
+    private void onAck(String message){
+        JSONObject json = OrtcMessage.parseJSON(message);
+
+        if (json != null && json.containsKey("m") && json.containsKey("seq")){
+            try {
+                HashMap pendingMsg = (HashMap) pendingPublishMessages.get((String)json.get("m"));
+
+                // cancel publish timeout
+                Timer timeout = (Timer) pendingMsg.get("timeout");
+                if(timeout != null) {
+                    timeout.cancel();
+                }
+
+                OnPublishResult callback = (OnPublishResult)pendingMsg.get("callback");
+                callback.run(null, (String)json.get("seq"));
+
+                pendingPublishMessages.remove((String)json.get("m"));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
 	private void addSocketEventsListener() {
 		final OrtcClient sender = this;
 		socket.setEventHandler(new WebSocketEventHandler() {
@@ -102,7 +127,6 @@ public final class IbtRealtimeSJClient extends OrtcClient {
 			public void onMessage(WebSocketMessage socketMessage) {
 				try {
 					String message = socketMessage.getText();
-					// message = message.replace("\\\"", "\"");
 					lastHeartBeat = new Date();
 					if ("h".equals(message)) {
 						//lastHeartBeat = new Date();
@@ -126,6 +150,9 @@ public final class IbtRealtimeSJClient extends OrtcClient {
 								case Received:
 									onReceived(ortcMessage);
 									break;
+                                case ack:
+                                    onAck(message);
+                                    break;
 								case Error:
 									onError(ortcMessage);
 									break;
@@ -189,7 +216,7 @@ public final class IbtRealtimeSJClient extends OrtcClient {
 
 	private void onReceived(OrtcMessage message) {
 		raiseOrtcEvent(EventEnum.OnReceived, message.getMessageChannel(), message.getMessage(), message.getMessageId(), message.getMessagePart(),
-				message.getMessageTotalParts(), message.isFiltered());
+				message.getMessageTotalParts(), message.isFiltered(), message.getSeqId());
 	}
 
 	@SuppressWarnings("incomplete-switch")
@@ -279,6 +306,18 @@ public final class IbtRealtimeSJClient extends OrtcClient {
 		}
 	}
 
+    @Override
+    protected  void publish(String channel, String message, int ttl, String messagePartIdentifier, String permission){
+        String escapedMessage = JSONValue.escape(message);
+
+        String messageParsed = String.format("publish;%s;%s;%s;%s;%s;%s",
+                this.applicationKey, this.authenticationToken, channel,
+                ttl,
+                permission,
+                String.format("%s_%s", messagePartIdentifier, escapedMessage));
+        sendMessage(messageParsed);
+    }
+
 	@Override
 	protected void send(String channel, String message, String messagePartIdentifier, String permission) {
 		String escapedMessage = JSONValue.escape(message);
@@ -308,6 +347,24 @@ public final class IbtRealtimeSJClient extends OrtcClient {
 			subscribeMessage = subscribeMessage + ";" + filter;
 		sendMessage(subscribeMessage);
 	}
+
+    @Override
+    protected void sendAck(String channel, String messageId, String seqId, String asAllParts){
+        String ackMessage = String.format("ack;%s;%s;%s;%s;%s",
+                this.applicationKey, channel, messageId, seqId, asAllParts);
+        sendMessage(ackMessage);
+    }
+
+    @Override
+    protected void _subscribeWithOptions(String channel, String permission, boolean subscribeOnReconnected,
+                                         String filter, String subscriberId){
+        String subscribeMessage = String.format("subscribeoptions;%s;%s;%s;%s;%s;%s;%s;%s",
+                this.applicationKey, this.authenticationToken, channel, subscriberId,
+                "", "", // device token and push platform not available
+                permission,
+                String.format("%s", (filter == null ? "":filter)));
+        sendMessage(subscribeMessage);
+    }
 
 	private void sendMessage(String message) {
 		try {

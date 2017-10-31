@@ -4,9 +4,13 @@ import org.json.simple.JSONValue;
 
 public class CharEscaper {
 	public static String removeEsc(String str){
-		Object o1 = JSONValue.parse("\""+str+"\"");
-		Object o2 = JSONValue.parse("\""+o1.toString()+"\"");
-		return o2.toString();				
+	    try {
+            Object o1 = JSONValue.parse("\""+str+"\"");
+            Object o2 = JSONValue.parse("\""+o1.toString()+"\"");
+            return o2.toString();
+        } catch(NullPointerException e) {
+	      return str;
+        }
 	}
 	/*
 	public static String addEsc(String str){
